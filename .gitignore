@@ -191,6 +191,8 @@ dataset/gaia/utils/*.jsonl
 
 /runs/
 
+transformers/
+
 .$*.drawio.bkp
 /diagrams/*.pdf
 /diagrams/*.png

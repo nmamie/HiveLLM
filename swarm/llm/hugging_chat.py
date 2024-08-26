@@ -58,7 +58,7 @@ print('Model loaded')
 def hugging_chat(
     model,
     messages: List[str],
-    max_tokens: int = 32,
+    max_tokens: int = 50,
     temperature: float = 0.2,
     num_comps=1,
     return_cost=False,
@@ -101,7 +101,7 @@ def hugging_chat(
 async def hugging_achat(
     model,
     messages: List[str],
-    max_tokens: int = 32,
+    max_tokens: int = 50,
     temperature: float = 0.2,
     num_comps=1,
     return_cost=False,

@@ -7,11 +7,13 @@ from copy import deepcopy
 from typing import Tuple
 import random
 
+from sklearn.metrics.pairwise import cosine_similarity
+
 from swarm.graph.node import Node
 from swarm.graph.graph import Graph
 from swarm.graph.composite_graph import CompositeGraph
 
-from swarm.optimizer.edge_optimizer.graph_net.gat import GATWithSentenceEmbedding
+from swarm.optimizer.edge_optimizer.graph_net.gat import GATWithSentenceEmbedding, LinkPredictor
 
 
 class ConnectDistribution(nn.Module):
@@ -37,13 +39,24 @@ class EdgeWiseDistribution(ConnectDistribution):
         # init_tensor = torch.ones(
         #     len(potential_connections)) * init_logit
         # self.edge_logits = torch.nn.Parameter(init_tensor)
+        self.device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
         node_ids = set([x for pair in potential_connections for x in pair])
         self.node_idx2id = {i: node_id for i, node_id in enumerate(node_ids)}
         self.node_id2idx = {node_id: i for i, node_id in enumerate(node_ids)}
         order_tensor = torch.randn(len(node_ids))
         self.order_params = torch.nn.Parameter(order_tensor)
-        self.node_features = torch.nn.Parameter(torch.randn(len(node_ids), 32))
-        self.gat = GATWithSentenceEmbedding(num_node_features=32, hidden_channels=64, sentence_embedding_dim=768, num_heads=4)
+        self.node_features = torch.nn.Parameter(torch.randn(len(node_ids), 768))
+        self.gat = GATWithSentenceEmbedding(num_node_features=16, hidden_channels=8, sentence_embedding_dim=768, num_heads=8).to(self.device)
+        self.link_predictor = LinkPredictor(in_channels=16).to(self.device)
+        # edge index
+        edges = self.potential_connections
+        # Unique nodes
+        nodes = list(set([node for edge in edges for node in edge]))
+        # Create a mapping from node labels to indices
+        node_to_index = {node: i for i, node in enumerate(nodes)}
+        # Convert the edges to index format
+        self.edge_index = torch.tensor([[node_to_index[edge[0]], node_to_index[edge[1]]] for edge in edges], dtype=torch.long).t()
+        
         
     def random_sample_num_edges(self, graph: CompositeGraph, num_edges: int) -> CompositeGraph:
         _graph = deepcopy(graph)
@@ -195,26 +208,43 @@ class EdgeWiseDistribution(ConnectDistribution):
                     in_node.add_predecessor(out_node)
         return _graph
     
-    def realize_gat(self, graph: CompositeGraph, record) -> CompositeGraph:
+    def realize_gat(self, graph: CompositeGraph, record, node_features: torch.tensor) -> CompositeGraph:
         _graph = deepcopy(graph)
-        _graph_full = self.realize_full(_graph)
+        # _graph_full = self.realize_full(_graph)
         # input sentence
         query = record['question']
         # adjacency matrix
-        edge_index = _graph_full.get_edge_index()
+        # edge_index = _graph_full.get_edge_index()        
+        x = node_features
+        # edge_index = deepcopy(self.edge_index)
+        edge_probs = self.link_predictor(x[self.edge_index[0]], x[self.edge_index[1]])
+
+        # Define a threshold to create edges based on similarity
+        threshold = 0.5
+        edges = []
+        for i, prob in enumerate(edge_probs):
+            if prob > threshold:
+                edges.append(self.edge_index[:, i].tolist())
+
+        # Convert edges to tensor format
+        edge_index = torch.tensor(edges, dtype=torch.long).t()
+        print(f"Edge index: {edge_index}")
+        print(f"ORIGINAL EDGE INDEX: {self.edge_index}")
         
-        x = deepcopy(self.node_features)
+        if len(edge_index) == 0:
+            return _graph, None
+                
+        # with torch.no_grad():
+        with torch.no_grad():
+            node_embeddings = self.gat(x, edge_index, query)
+            edge_probs = self.link_predictor(node_embeddings[self.edge_index[0]], node_embeddings[self.edge_index[1]])
         
-        self.gat.train()
-        
-        edge_probs = self.gat(x, edge_index, query)
-        
-        edge_mask = []
         # detach edge_probs
         edge_probs = edge_probs.detach().cpu()
-        print("edge_probs: ", edge_probs)
+        
+        edge_mask = [] 
         for prob in edge_probs:
-            edge_mask.append(prob > torch.rand(1))
+            edge_mask.append(prob > 0.5)
         edge_mask = torch.stack(edge_mask)
         
         for i, (potential_connection, is_edge) in enumerate(zip(self.potential_connections, edge_mask)):
@@ -228,4 +258,4 @@ class EdgeWiseDistribution(ConnectDistribution):
                 if is_edge:
                     out_node.add_successor(in_node)
                     in_node.add_predecessor(out_node)
-        return _graph
+        return _graph, edge_probs

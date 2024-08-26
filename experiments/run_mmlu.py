@@ -19,8 +19,8 @@ def parse_args():
     parser.add_argument('--num-truthful-agents', type=int, default=1,
                         help="Number of truthful agents. The total will be N truthful and N adversarial.")
 
-    parser.add_argument('--num-iterations', type=int, default=30,
-                        help="Number of optimization iterations. Default 30.")
+    parser.add_argument('--num-iterations', type=int, default=50,
+                        help="Number of optimization iterations. Default 50.")
 
     parser.add_argument('--model_name', type=str, default="inference",
                         help="Model name, None runs the default ChatGPT4. Custom runs HF model. Inference runs the Meta-LLama-3.1-8B-Instruct model.")

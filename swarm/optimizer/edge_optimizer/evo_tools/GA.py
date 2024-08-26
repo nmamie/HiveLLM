@@ -4,6 +4,7 @@
 # @Author  : github.com/guofei9987
 
 
+import random
 import numpy as np
 import torch
 from .base import SkoBase
@@ -101,12 +102,30 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         best = []
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
+        num_node_features = torch.numel(self._swarm.connection_dist.node_features)
         for i in range(self.max_iter):
             print(f"Iter {i}", 80*'-')
             start_ts = time.time()
             
             self.X = self.chrom2x(self.Chrom)
             print("X:", self.X)
+            if i == 0:
+                with torch.no_grad():
+                    rand_init = random.choice(self.X)
+                    gat_params = rand_init[(num_nodes+num_pot_edges):]
+                    train_p = [p for p in self._swarm.connection_dist.gat.parameters() if p.requires_grad]
+                    # replace every parameter with the respective gat parameter
+                    old_p_sizes = 0
+                    for p in train_p:
+                        p_size = p.numel()
+                        new_p = torch.tensor(gat_params[old_p_sizes:old_p_sizes+p_size]\
+                            .reshape(p.size()), device=self.device, dtype=torch.float32)
+                        new_p = torch.nn.Parameter(new_p, requires_grad=True)
+                        print("old_p:", p.shape)
+                        p.copy_(new_p)
+                        print("new_p:", p.shape)
+                        old_p_sizes += p_size
+
             self.Y = await self.x2y()
             # squeeze the fitness value to 1D array
             self.Y = np.squeeze(self.Y)
@@ -143,17 +162,30 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             # edge_probs = torch.nn.Parameter(self.best_x[:num_pot_edges])
             # order_params = torch.nn.Parameter(self.best_x[num_pot_edges:])
             order_params = torch.nn.Parameter(self.best_x[:num_nodes])
-            node_features = torch.nn.Parameter(self.best_x[num_nodes:(num_nodes+num_pot_edges)])
-            gat_params = self.best_x[(num_nodes+num_pot_edges):]
+            # create 32-dimensional node features
+            node_features = torch.tensor(self.best_x[num_nodes:(num_nodes+num_node_features)].reshape(num_nodes, -1), device=self.device, dtype=torch.float32)
+            node_features = torch.nn.Parameter(node_features)
+            gat_params = self.best_x[(num_nodes+num_node_features):]
             # self._swarm.connection_dist.edge_logits = edge_probs
             self._swarm.connection_dist.order_params = order_params
-            # self._swarm.connection_dist.node_features = node_features
+            self._swarm.connection_dist.node_features = node_features
             # update all trainable GAT parameters
-            # train_p = [p for p in self._swarm.connection_dist.gat.parameters() if p.requires_grad]
-            # for p, new_p in zip(train_p, gat_params):
-            #     p.data = new_p
+            with torch.no_grad():
+                train_p = [p for p in self._swarm.connection_dist.gat.parameters() if p.requires_grad]
+                # replace every parameter with the respective gat parameter
+                old_p_sizes = 0
+                for p in train_p:
+                    p_size = p.numel()
+                    new_p = torch.tensor(gat_params[old_p_sizes:old_p_sizes+p_size]\
+                        .reshape(p.size()), device=self.device, dtype=torch.float32)
+                    new_p = torch.nn.Parameter(new_p, requires_grad=True)
+                    p.copy_(new_p)
+                    old_p_sizes += p_size
             
             
+            order_probs = torch.nn.Sigmoid()(order_params)
+            print("Order probabilities:")
+            print(order_probs)
             # print("Edge probabilities:")
             # print(edge_probs)
             # print("Order parameters:")
@@ -259,7 +291,7 @@ class GA(GeneticAlgorithmBase):
 
         self.len_chrom = sum(self.Lind)
         
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda:7" if torch.cuda.is_available() else "cpu"
         
         self.crtbp()
 
