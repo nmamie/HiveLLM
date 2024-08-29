@@ -38,9 +38,9 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         self.hidden_channels = hidden_channels
         self.sentence_embedding_dim = sentence_embedding_dim
         
-        self.conv1 = GATConv(sentence_embedding_dim * 2, hidden_channels, heads=num_heads, dropout=0.6, add_self_loops=False)
-        self.conv2 = GATConv(hidden_channels * num_heads, num_node_features, heads=1, dropout=0.6, add_self_loops=False)
-        # self.fc = Linear(768, sentence_embedding_dim)
+        self.conv1 = GATConv(sentence_embedding_dim * 2, hidden_channels, heads=num_heads, dropout=0.6)
+        self.conv2 = GATConv(hidden_channels * num_heads, num_node_features, dropout=0.3, heads=1, concat=False)
+        self.fc = Linear(768, sentence_embedding_dim)
 
         # Load pre-trained BERT model and tokenizer
         # Using a distilled BERT model (smaller and faster with fewer parameters)
@@ -67,6 +67,8 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         with torch.no_grad():
             sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
             sentence_embedding = sentence_embedding.squeeze(0)
+            sentence_embedding = self.fc(sentence_embedding)
+            print("Sentence embedding:", sentence_embedding)
             
         print("Node features shape:", x.shape)
         print("Edge index shape:", edge_index.shape)
@@ -78,6 +80,7 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         # Pass through the GAT layers
         x, attention = self.conv1(x, edge_index, return_attention_weights=True)
         x = F.elu(x)
+        print(f"Node embeddings after first conv: {x}")
         print(f"Attention first conv: {attention}")
         x, attention = self.conv2(x, edge_index.to(self.device), return_attention_weights=True)                
         
@@ -86,25 +89,35 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         
         print(f"Node embeddings: {x}")
         
-        # x = F.normalize(x, p=2, dim=-1)
+        # # define edge probabilities as attention weights
+        # attention_scores = []
+        # # filter out self-loops using edge_index
+        # for i, (src, dst) in enumerate(edge_index.t().tolist()):
+        #     if src != dst:
+        #         attention_scores.append(attention[1][i])
         
-        # sentence_embedding_repeated = sentence_embedding.repeat(x.shape[0], 1)
+        # attention_scores = torch.stack(attention_scores)
         
-        # x = torch.cat((x, sentence_embedding_repeated), dim=1)
-        
-        # print(f"Normalized node embeddings: {x}")
+        # # Min-max scaling to [0, 1]
+        # min_val = attention_scores.min()
+        # max_val = attention_scores.max()
+        # if min_val < 0 or max_val > 1:
+        #     attention_scores = (attention_scores - min_val) / (max_val - min_val + 1e-8)     
         
         return x
-    
     
 class LinkPredictor(torch.nn.Module):
     def __init__(self, in_channels):
         super(LinkPredictor, self).__init__()
-        # self.fc = Linear(in_channels * 2, 1)  # Concatenating embeddings of node pairs
-
+        self.fc = nn.Linear(in_channels * 2, 2) # logistic regression for binary classification (edge or no edge)
+        
     def forward(self, x_i, x_j):
-        # Compute the inner product between node embeddings
-        edge_probabilities = torch.sum(x_i * x_j, dim=-1)
-        edge_probabilities = torch.sigmoid(edge_probabilities)
+        # Concatenate node embeddings
+        edge_input = torch.cat([x_i, x_j], dim=1)
+        
+        # Pass through the MLP
+        edge_probabilities = F.softmax(self.fc(edge_input), dim=1)
         print(f"Edge probabilities: {edge_probabilities}")
+        edge_probabilities = edge_probabilities[:, 0]
+        
         return edge_probabilities

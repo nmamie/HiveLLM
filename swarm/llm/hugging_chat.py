@@ -102,7 +102,7 @@ async def hugging_achat(
     model,
     messages: List[str],
     max_tokens: int = 50,
-    temperature: float = 0.2,
+    temperature: float = 0.0,
     num_comps=1,
     return_cost=False,
 ) -> Union[List[str], str]:

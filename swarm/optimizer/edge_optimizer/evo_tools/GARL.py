@@ -4,7 +4,9 @@
 # @Author  : github.com/guofei9987
 
 
+import random
 import numpy as np
+from copy import deepcopy
 import torch
 from .base import SkoBase
 from .tools import func_transformer
@@ -21,18 +23,17 @@ import asyncio
 class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
     def __init__(self, func, n_dim,
                  size_pop=50, max_iter=200, prob_mut=0.001,
-                 constraint_eq=tuple(), constraint_ueq=tuple(), early_stop=None, n_processes=0, rl_optimizer=None,
+                 constraint_eq=tuple(), constraint_ueq=tuple(), early_stop=None, n_processes=0, optimizer=None,
                  utilities=None, swarm=None, logger=None, art_dir_name=None, evaluator=None, use_learned_order=False):
         
         self.func = func_transformer(func, n_processes)
-        self.rl_optimizer = rl_optimizer
-        # self.func = func
         assert size_pop % 2 == 0, 'size_pop must be even integer'
         self.size_pop = size_pop  # size of population
         self.max_iter = max_iter
         self.prob_mut = prob_mut  # probability of mutation
         self.n_dim = n_dim
         self.early_stop = early_stop
+        self.optimizer = optimizer
 
         # constraint:
         if constraint_eq is not None or constraint_ueq is not None:
@@ -103,24 +104,24 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         best = []
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
+        num_node_features = len(self._swarm.connection_dist.node_features.reshape(-1))
         for i in range(self.max_iter):
             print(f"Iter {i}", 80*'-')
             start_ts = time.time()
             
             self.X = self.chrom2x(self.Chrom)
             print("X:", self.X)
+
+            self.optimizer.zero_grad()
             self.Y = await self.x2y()
+            self.optimizer.step()
+            # print(self.optimizer.param_groups[0]['params'][0])
+            # import pdb; pdb.set_trace()
             # squeeze the fitness value to 1D array
             self.Y = np.squeeze(self.Y)
             print("Y:", self.Y)
             swarm_fitness = np.mean(self.Y)
-            # if len(self.all_history_Y) == 0:
-            #     all_history_mean = [0] * self.size_pop
-            # else:
-            #     # historical mean for every particle's fitness
-            #     all_history_mean = np.mean(self.all_history_Y, axis=0)
-            # fitness value calculation
-            self.Y = [(0.8*f + 0.2*swarm_fitness) for f in self.Y]
+            self.Y = [0.9*f + 0.1*swarm_fitness for f in self.Y] 
             self.FitV = np.array(self.Y)
             print('Generation:', i, 'Best FitV:', 100 * self.FitV.max())
             print('Generation:', i, 'Mean FitV:', 100 * self.FitV.mean())
@@ -145,27 +146,29 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             self.best_x = torch.tensor(self.generation_best_X[global_best_index])
             self.best_y = self.generation_best_Y[global_best_index]
             
-            # # self.best_x = torch.nn.Sigmoid()(self.best_x)
+            # self.best_x = torch.nn.Sigmoid()(self.best_x)         
             
-            # # update the edge probabilities with fittest individual
+            # update the edge probabilities with fittest individual
             # edge_probs = torch.nn.Parameter(self.best_x[:num_pot_edges])
-            # order_params = torch.nn.Parameter(self.best_x[:num_nodes])
+            # order_params = torch.nn.Parameter(self.best_x[num_pot_edges:])
+            order_params = self.best_x[:num_nodes]
+            # create 32-dimensional node features
+            node_features = torch.tensor(self.best_x[num_nodes:(num_nodes+num_node_features)].reshape(num_nodes, -1), device=self.device, dtype=torch.float32)
+            # gat_params = self.best_x[(num_nodes+num_node_features):]
             # self._swarm.connection_dist.edge_logits = edge_probs
-            # self._swarm.connection_dist.order_params = order_params
+            self._swarm.connection_dist.order_params = order_params
+            self._swarm.connection_dist.node_features = node_features
             
+            
+            order_probs = torch.nn.Sigmoid()(order_params)
+            print("Order probabilities:")
+            print(order_probs)
             # print("Edge probabilities:")
-            # print(torch.nn.Sigmoid()(edge_probs))
+            # print(edge_probs)
             # print("Order parameters:")
-            # print(torch.nn.Sigmoid()(order_params))
-            
-            self.rl_optimizer.step()
-            self.rl_optimizer.zero_grad()
-            
-            print("edge_logits:", self._swarm.connection_dist.edge_logits)
-            edge_probs = torch.sigmoid(self._swarm.connection_dist.edge_logits)
-            print("edge_probs:", edge_probs)   
+            # print(order_params)
 
-            self.print_conns(edge_probs)
+            # self.print_conns(edge_probs)
 
             if self.early_stop:
                 best.append(min(self.generation_best_Y))
@@ -193,7 +196,7 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
 
 
 class GARL(GeneticAlgorithmBase):
-    """genetic algorithm with Reinforcement Learning
+    """genetic algorithm for Reinforcement Learning
 
     Parameters
     ----------------
@@ -237,9 +240,9 @@ class GARL(GeneticAlgorithmBase):
                  prob_mut=0.001,
                  lb=-1, ub=1,
                  constraint_eq=tuple(), constraint_ueq=tuple(),
-                 precision=1e-7, early_stop=None, n_processes=0, rl_optimizer=None,
+                 precision=1e-7, early_stop=None, n_processes=0, optimizer=None,
                  utilities=None, swarm=None, logger=None, art_dir_name=None, evaluator=None, use_learned_order=False):
-        super().__init__(func, n_dim, size_pop, max_iter, prob_mut, constraint_eq, constraint_ueq, early_stop, n_processes, rl_optimizer, utilities, swarm, logger, art_dir_name, evaluator, use_learned_order)
+        super().__init__(func, n_dim, size_pop, max_iter, prob_mut, constraint_eq, constraint_ueq, early_stop, n_processes, optimizer, utilities, swarm, logger, art_dir_name, evaluator, use_learned_order)
 
         self.lb, self.ub = np.array(lb) * np.ones(self.n_dim), np.array(ub) * np.ones(self.n_dim)
         self.precision = np.array(precision) * np.ones(self.n_dim)  # works when precision is int, float, list or array
@@ -249,7 +252,9 @@ class GARL(GeneticAlgorithmBase):
 
         # Lind is the num of genes of every variable of func（segments）
         Lind_raw = np.log2((self.ub - self.lb) / self.precision + 1)
-        self.Lind = np.ceil(Lind_raw).astype(int)        
+        self.Lind = np.ceil(Lind_raw).astype(int)
+        
+        
 
         # if precision is integer:
         # if Lind_raw is integer, which means the number of all possible value is 2**n, no need to modify
@@ -263,7 +268,7 @@ class GARL(GeneticAlgorithmBase):
 
         self.len_chrom = sum(self.Lind)
         
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda:7" if torch.cuda.is_available() else "cpu"
         
         self.crtbp()
 

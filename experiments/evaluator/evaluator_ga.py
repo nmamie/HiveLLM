@@ -154,7 +154,7 @@ class Evaluator():
                 if mode == 'external_edge_probs':
                     self._swarm.connection_dist.gat.eval()
                     with torch.no_grad():
-                        realized_graph, edge_probs = self._swarm.connection_dist.realize_gat(self._swarm.composite_graph, record)
+                        realized_graph, edge_probs = self._swarm.connection_dist.realize_gat(self._swarm.composite_graph, record, self._swarm.connection_dist.node_features)
                     realized_graph.display()
                     if edge_probs is not None:
                         self._print_conns(edge_probs, save_to_file=False)
@@ -226,7 +226,7 @@ class Evaluator():
         dataset = self._train_dataset
 
         print(f"Optimizing swarm on {dataset.__class__.__name__} split {dataset.split}")
-
+        
         if self._art_dir_name is not None:
             hp_json_name = os.path.join(self._art_dir_name, "hp.json")
             with open(hp_json_name, "w") as f:
@@ -266,7 +266,7 @@ class Evaluator():
             gat_params = particle[torch.numel(self._swarm.connection_dist.order_params) + torch.numel(self._swarm.connection_dist.node_features):]
             
             swarm_copy = copy.deepcopy(self._swarm)
-            # update params
+            # # update params
             with torch.no_grad():
                 swarm_copy.connection_dist.order_params = torch.nn.Parameter(order_params)
                 swarm_copy.connection_dist.node_features = torch.nn.Parameter(node_features)

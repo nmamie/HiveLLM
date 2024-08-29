@@ -23,7 +23,7 @@ class DirectAnswer(Node):
                  domain: str,
                  model_name: Optional[str],
                  operation_description: str = "Directly output an answer.",
-                 max_token: int = 32, 
+                 max_token: int = 50, 
                  id=None):
         super().__init__(operation_description, id, True)
         self.model_name: Optional[str] = model_name
