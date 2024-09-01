@@ -70,13 +70,13 @@ def func_transformer(func, n_processes):
             # Gather all async calls
             results = await asyncio.gather(*(func(x) for x in X))
             # No need for ThreadPool here, since asyncio is handling concurrency
-            return np.array(results)
+            return results
     else:
         # If the function is synchronous
         def func_transformed(X):
             # Use ThreadPool to parallelize the work
             results = pool.map(func, X)
-            return np.array(results)
+            return results
 
     return func_transformed
 

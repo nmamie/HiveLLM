@@ -19,7 +19,7 @@ class MMLUPromptSet(PromptSet):
     
     @staticmethod
     def get_adversarial_role():
-        return "a bla bla bla agent"
+        return "a I have no idea agent"
 
     @staticmethod
     def get_constraint():
@@ -36,7 +36,7 @@ class MMLUPromptSet(PromptSet):
     @staticmethod
     def get_adversarial_constraint():
         return """
-            I will ask you a question, just answer with bla bla bla.
+            I will ask you a question, just answer with I have no idea.
         """
 
         
@@ -63,7 +63,7 @@ class MMLUPromptSet(PromptSet):
 
     @staticmethod
     def get_adversarial_answer_prompt(question):
-        return f"""Answer bla bla bla to the following question: {question}."""
+        return f"""Answer I have no idea to the following question: {question}."""
 
     @staticmethod
     def get_distill_websearch_prompt(query, results):

@@ -16,6 +16,7 @@ from .operators import crossover, mutation, ranking, selection
 import time
 import json
 import os
+from tqdm import tqdm
 
 import asyncio
 
@@ -59,6 +60,8 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
 
         self.all_history_Y = []
         self.all_history_FitV = []
+        self.all_history_X = []
+        self.all_history_mean_Y = []
 
         self.mean_x, self.mean_y = None, None
         self.best_x, self.best_y = None, None
@@ -68,7 +71,12 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         pass
 
     async def x2y(self):
-        self.Y_raw = await self.func(self.X)
+        results = await self.func(self.X)
+        # results contains tuple of (Y, loss_list, edge_logits)
+        self.Y_raw = np.array([y for y, loss, edge_logits in results])
+        loss_list = torch.stack([loss for y, loss, edge_logits in results])
+        edge_logits_list = torch.stack([edge_logits for y, loss, edge_logits in results])
+            
         if not self.has_constraint:
             self.Y = self.Y_raw
         else:
@@ -76,7 +84,7 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             penalty_eq = np.array([np.sum(np.abs([c_i(x) for c_i in self.constraint_eq])) for x in self.X])
             penalty_ueq = np.array([np.sum(np.abs([max(0, c_i(x)) for c_i in self.constraint_ueq])) for x in self.X])
             self.Y = self.Y_raw + 1e5 * penalty_eq + 1e5 * penalty_ueq
-        return self.Y
+        return self.Y, loss_list, edge_logits_list
 
     # @abstractmethod
     # def ranking(self):
@@ -105,7 +113,8 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
         num_node_features = len(self._swarm.connection_dist.node_features.reshape(-1))
-        for i in range(self.max_iter):
+        pbar = tqdm(range(self.max_iter))
+        for i in pbar:
             print(f"Iter {i}", 80*'-')
             start_ts = time.time()
             
@@ -113,7 +122,16 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             print("X:", self.X)
 
             self.optimizer.zero_grad()
-            self.Y = await self.x2y()
+            self.Y, loss_list, edge_logits = await self.x2y()
+            total_loss = torch.mean(loss_list) + 0.01 * (edge_logits**2).mean()
+            total_loss.backward()
+            # divide all the gradients by the size of the population
+            # for param in self._swarm.connection_dist.parameters():
+            #     if param.requires_grad and param.grad is not None:
+            #         print("param.grad:", param.grad)
+            #         param.grad /= self.size_pop
+            # clip the gradients
+            # torch.nn.utils.clip_grad_norm_(self._swarm.connection_dist.parameters(), 1.0)    
             self.optimizer.step()
             # print(self.optimizer.param_groups[0]['params'][0])
             # import pdb; pdb.set_trace()
@@ -138,6 +156,8 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             self.generation_best_Y.append(self.Y[generation_best_index])
             self.all_history_Y.append(self.Y)
             self.all_history_FitV.append(self.FitV)
+            self.all_history_X.append(self.X)
+            self.all_history_mean_Y.append(np.mean(self.Y))
             
             # output the edge probabilities
             global_best_index = np.array(self.generation_best_Y).argmax()
@@ -153,7 +173,7 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             # order_params = torch.nn.Parameter(self.best_x[num_pot_edges:])
             order_params = self.best_x[:num_nodes]
             # create 32-dimensional node features
-            node_features = torch.tensor(self.best_x[num_nodes:(num_nodes+num_node_features)].reshape(num_nodes, -1), device=self.device, dtype=torch.float32)
+            node_features = torch.tensor(self.best_x[num_nodes:].reshape(num_nodes, -1), device=self.device, dtype=torch.float32)
             # gat_params = self.best_x[(num_nodes+num_node_features):]
             # self._swarm.connection_dist.edge_logits = edge_probs
             self._swarm.connection_dist.order_params = order_params
@@ -190,6 +210,15 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
                 f.write("\n")
         print("end of iteration")
         
+        # plot history
+        if self._art_dir_name is not None:
+            import matplotlib.pyplot as plt
+            plt.plot(np.max(self.all_history_Y, axis=1), label='max_Y', color='b')
+            plt.plot(self.all_history_mean_Y, label='mean_Y', color='r')
+            plt.legend()
+            plt.savefig(os.path.join(self._art_dir_name, "history.png"))
+            plt.close()
+ 
         return self.best_x
 
     fit = run
@@ -268,7 +297,7 @@ class GARL(GeneticAlgorithmBase):
 
         self.len_chrom = sum(self.Lind)
         
-        self.device = "cuda:7" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         self.crtbp()
 
