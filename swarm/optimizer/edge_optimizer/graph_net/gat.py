@@ -40,12 +40,11 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         self.hidden_channels = hidden_channels
         self.sentence_embedding_dim = sentence_embedding_dim
         
-        self.conv1 = GATConv(num_node_features, hidden_channels, heads=num_heads, dropout=0.6)
+        self.conv1 = GATConv(sentence_embedding_dim, hidden_channels, heads=num_heads, dropout=0.6)
         self.conv2 = GATConv(hidden_channels * num_heads, num_node_features, dropout=0.6, heads=num_heads, concat=False)
         self.fc0 = Linear(768, sentence_embedding_dim)
-        self.fc1 = Linear(sentence_embedding_dim * 2, num_node_features)
-        self.fc2 = Linear(num_node_features * 2, num_node_features)
-        self.fc3 = Linear(num_node_features, 1) # logistic regression
+        self.fc1 = Linear(num_node_features * 2, num_node_features)
+        self.fc2 = Linear(num_node_features, 1) # logistic regression
                 
         # Load pre-trained BERT model and tokenizer
         # Using a distilled BERT model (smaller and faster with fewer parameters)
@@ -73,20 +72,19 @@ class GATWithSentenceEmbedding(torch.nn.Module):
             sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
             sentence_embedding = sentence_embedding.squeeze(0)
             sentence_embedding = self.fc0(sentence_embedding)
-            # print("Sentence embedding:", sentence_embedding)
+            print("Sentence embedding:", sentence_embedding)
             
-        # print("Node features shape:", x.shape)
-        # print("Edge index shape:", edge_index.shape)
-        # print("Sentence embedding shape:", sentence_embedding.shape)
+        print("Node features shape:", x.shape)
+        print("Edge index shape:", edge_index.shape)
+        print("Sentence embedding shape:", sentence_embedding.shape)
         
-        sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
-        x = torch.cat([x, sentence_embedding_repeat], dim=1)
-        x_reduced = self.fc1(x)
-        # x_reconstructed = self.fc2(x_reduced)
-        # print("Reduced node features:", x_reduced)
+        # sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
+        # x = torch.cat([x, sentence_embedding_repeat], dim=1)
+        x_enc = x + sentence_embedding
+        print("Reduced node features:", x_enc)
                 
         # Pass through the GAT layers
-        x, attention = self.conv1(x_reduced, edge_index, return_attention_weights=True)
+        x, attention = self.conv1(x_enc, edge_index, return_attention_weights=True)
         x = F.elu(x)
         # print(f"Node embeddings after first conv: {x}")
         # print(f"Attention first conv: {attention}")
@@ -100,9 +98,9 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         x_i, x_j = x[edge_index[0]], x[edge_index[1]]
         edge_input = torch.cat([x_i, x_j], dim=1)
         
-        edge_logits = nn.ReLU()(self.fc2(edge_input))
+        edge_logits = nn.ReLU()(self.fc1(edge_input))
         edge_logits = nn.Dropout(0.2)(edge_logits)
-        edge_logits = self.fc3(edge_logits)
+        edge_logits = self.fc2(edge_logits)
         print(f"Edge logits: {edge_logits}")
         
         # # define edge probabilities as attention weights

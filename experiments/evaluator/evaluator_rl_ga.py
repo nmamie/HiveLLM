@@ -244,7 +244,7 @@ class Evaluator():
                                ), f)
 
         def infinite_data_loader() -> Iterator[pd.DataFrame]:
-            np.random.seed(42)
+            # np.random.seed(42)
             perm = np.random.permutation(len(dataset))
             while True:
                 for idx in perm:
@@ -322,8 +322,8 @@ class Evaluator():
                 utility = 0.5*output_accuracy.get() + 0.5*intermediate_accuracy.get()
                 current_utilities.append(utility)
                 # self.utilities.append(utility)
-                # single_loss = -log_prob * (utility - 0.4)
-                single_loss = -log_prob * utility
+                single_loss = -log_prob * output_accuracy.get()
+                # single_loss = -log_prob * output_accuracy.get()
                 loss_list.append(single_loss)
             fitness.append(np.mean(current_utilities))
             
