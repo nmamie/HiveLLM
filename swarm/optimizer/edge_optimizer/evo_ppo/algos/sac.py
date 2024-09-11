@@ -77,3 +77,4 @@ class SAC(object):
 
         self.num_updates += 1
         soft_update(self.critic_target, self.critic, self.tau)
+

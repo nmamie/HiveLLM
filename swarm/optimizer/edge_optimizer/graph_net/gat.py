@@ -42,18 +42,18 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         
         self.conv1 = GATConv(sentence_embedding_dim, hidden_channels, heads=num_heads, dropout=0.6)
         self.conv2 = GATConv(hidden_channels * num_heads, num_node_features, dropout=0.6, heads=num_heads, concat=False)
-        self.fc0 = Linear(768, sentence_embedding_dim)
+        # self.fc0 = Linear(768, sentence_embedding_dim)
         self.fc1 = Linear(num_node_features * 2, num_node_features)
         self.fc2 = Linear(num_node_features, 1) # logistic regression
                 
-        # Load pre-trained BERT model and tokenizer
-        # Using a distilled BERT model (smaller and faster with fewer parameters)
-        self.bert = BertModel.from_pretrained('distilbert-base-uncased').to(self.device) # type: ignore
-        self.tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
+        # # Load pre-trained BERT model and tokenizer
+        # # Using a distilled BERT model (smaller and faster with fewer parameters)
+        # self.bert = BertModel.from_pretrained('distilbert-base-uncased').to(self.device) # type: ignore
+        # self.tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
         
-        # Freeze BERT model parameters
-        for param in self.bert.parameters():
-            param.requires_grad = False
+        # # Freeze BERT model parameters
+        # for param in self.bert.parameters():
+        #     param.requires_grad = False
             
         # self.dropout = Dropout(0.6).to(self.device)
 
@@ -67,24 +67,24 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         # # normalize node features
         # x = F.normalize(x, p=2, dim=-1)
         
-        inputs = self.tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to(self.device)
-        with torch.no_grad():
-            sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
-            sentence_embedding = sentence_embedding.squeeze(0)
-            sentence_embedding = self.fc0(sentence_embedding)
-            print("Sentence embedding:", sentence_embedding)
+        # inputs = self.tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to(self.device)
+        # with torch.no_grad():
+        #     sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
+        #     sentence_embedding = sentence_embedding.squeeze(0)
+        #     sentence_embedding = self.fc0(sentence_embedding)
+        #     print("Sentence embedding:", sentence_embedding)
             
-        print("Node features shape:", x.shape)
-        print("Edge index shape:", edge_index.shape)
-        print("Sentence embedding shape:", sentence_embedding.shape)
+        # print("Node features shape:", x.shape)
+        # print("Edge index shape:", edge_index.shape)
+        # print("Sentence embedding shape:", sentence_embedding.shape)
         
         # sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
         # x = torch.cat([x, sentence_embedding_repeat], dim=1)
-        x_enc = x + sentence_embedding
-        print("Reduced node features:", x_enc)
+        # x_enc = x + sentence_embedding
+        # print("Reduced node features:", x_enc)
                 
         # Pass through the GAT layers
-        x, attention = self.conv1(x_enc, edge_index, return_attention_weights=True)
+        x, attention = self.conv1(x, edge_index, return_attention_weights=True)
         x = F.elu(x)
         # print(f"Node embeddings after first conv: {x}")
         # print(f"Attention first conv: {attention}")
@@ -118,7 +118,7 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         # if min_val < 0 or max_val > 1:
         #     attention_scores = (attention_scores - min_val) / (max_val - min_val + 1e-8)     
         
-        return edge_logits
+        return edge_logits, x, attention
     
 class LinkPredictor(torch.nn.Module):
     def __init__(self, in_channels):

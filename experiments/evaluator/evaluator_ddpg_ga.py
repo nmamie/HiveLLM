@@ -244,7 +244,6 @@ class Evaluator():
                                ), f)
 
         def infinite_data_loader() -> Iterator[pd.DataFrame]:
-            # np.random.seed(42)
             perm = np.random.permutation(len(dataset))
             while True:
                 for idx in perm:
@@ -258,130 +257,12 @@ class Evaluator():
         num_nodes = len(self._swarm.composite_graph.nodes)
         num_node_features = self._swarm.connection_dist.node_features.shape[0] + self._swarm.connection_dist.node_features.shape[1]
         
-        async def utility_func(particle: List[float]) -> np.array: # type: ignore
-            future_answers = []
-            correct_answers = []
-            fitness = []
-            
-            # # edge probs
-            # edge_probs = particle[:len(self._swarm.connection_dist.edge_logits)]
-            
-            # GAT params
-            order_params = torch.tensor(particle[:len(self._swarm.connection_dist.order_params)], device=self.device, dtype=torch.float32) # type: ignore
-            node_features = torch.tensor(particle[len(self._swarm.connection_dist.order_params):].reshape(num_nodes, -1), device=self.device, dtype=torch.float32) # type: ignore
-            
-            # swarm_copy = copy.deepcopy(self._swarm)
-            # # update params
-            # swarm_copy.connection_dist.order_params = order_params
-            # swarm_copy.connection_dist.node_features = node_features
-            
-            log_probs = []
-            for i, record in zip(range(batch_size), loader):
-                # create edge mask based on the particle
-                # edge_mask = []
-                # for prob in edge_probs:
-                #     edge_mask.append(prob > torch.rand(1))
-                # edge_mask = torch.stack(edge_mask)
-                # realize graph based on edge mask                
-                realized_graph, edge_probs, log_prob, edge_logits = self._swarm.connection_dist.realize_gat(self._swarm.composite_graph, record, node_features) # type: ignore
-                # edge probs all are None results in 0 fitness
-                if len(edge_probs) == 1 and edge_probs[0].item() == 0.0:
-                    edge_probs = torch.tensor([0.0]*num_pot_edges, device=self.device, dtype=torch.float32)
-                    edge_mask = edge_probs > 0.5
-                    realized_graph = self._swarm.connection_dist.realize_mask(self._swarm.composite_graph, edge_mask) # type: ignore
-                    print("Edge probs are None")
-                    self._print_conns(edge_probs, save_to_file=False)
-                    return np.array([0.0])
-                log_probs.append(log_prob)
-                self._print_conns(edge_probs, save_to_file=False)
-                # input_dict = dataset.record_to_swarm_input(record)
-                # future_answer = self._swarm.arun(input_dict, realized_graph, inference=False) # type: ignore
-                future_answer = self._swarm.arun(dataset, record, realized_graph, inference=False) # type: ignore
-                future_answers.append(future_answer)
-                correct_answer = dataset.record_to_target_answer(record)
-                correct_answers.append(correct_answer)
-            answers = await asyncio.gather(*future_answers)
-            
-            # every answer is a tuple of output_answer and intermediate_answers
-            raw_output_answers = [answer[0] for answer in answers]
-            raw_intermediate_answers = [answer[1] for answer in answers]
-            
-            current_utilities = []
-            loss_list = []
-            for raw_output_answer, raw_intermediate_answer, correct_answer, log_prob in zip(raw_output_answers, raw_intermediate_answers, correct_answers, log_probs):
-                output_accuracy = Accuracy()
-                intermediate_accuracy = Accuracy()
-                output_answer = dataset.postprocess_answer(raw_output_answer)
-                intermediate_answers = [dataset.postprocess_answer(intermediate_answer) for intermediate_answer in raw_intermediate_answer]
-                assert isinstance(correct_answer, str), \
-                    f"String expected but got {correct_answer} of type {type(correct_answer)} (1)"
-                output_accuracy.update(output_answer, correct_answer)
-                for intermediate_answer in intermediate_answers:
-                    assert isinstance(intermediate_answer, str), \
-                        f"String expected but got {intermediate_answer} of type {type(intermediate_answer)} (2)"
-                    intermediate_accuracy.update(intermediate_answer, correct_answer)
-                utility = 0.5*output_accuracy.get() + 0.5*intermediate_accuracy.get()
-                current_utilities.append(utility)
-                # self.utilities.append(utility)
-                single_loss = -log_prob * output_accuracy.get()
-                # single_loss = -log_prob * output_accuracy.get()
-                loss_list.append(single_loss)
-            fitness.append(np.mean(current_utilities))
-            
-            # if len(self.utilities) < batch_size:
-            #     moving_averages = np.array([np.mean(self.utilities) for _ in range(batch_size)])
-            # else:
-            #     moving_averages = np.array([np.mean(self.utilities[-batch_size:]) for _ in range(batch_size)])
-            # moving_averages = np.array([np.array(0.4) for _ in range(batch_size)])
-            print("log_probs:", log_probs)
-            # total_loss = (-torch.stack(log_probs) * torch.tensor(np.array(current_utilities) - moving_averages)).mean()
-            # total_loss = (-torch.stack(log_probs) * torch.tensor(np.array(current_utilities) - moving_averages)).mean() + 0.01 * (edge_logits**2).mean()
-            # total_loss = (-torch.stack(log_probs) * torch.tensor(np.array(loss_list)).to(self.device)).mean()
-            
-            # total_loss = torch.mean(torch.stack(loss_list)) + 0.01 * (edge_logits**2).mean()
-            print("utilities:", current_utilities)
-            print("fitness:", fitness)
-            print("loss:", single_loss.item())
-            # total_loss.requires_grad = True
-            # total_loss.backward()
-            # optimizer.step()
-            
-            if self._logger is not None:
-                self._logger.add_scalar("train/loss", single_loss.item())
-                self._logger.add_scalar("train/utility", np.mean(fitness))
-            if self._art_dir_name is not None:
-                log_jsonl_name = os.path.join(self._art_dir_name, "training.jsonl")
-                with open(log_jsonl_name, "a") as f:
-                    json.dump(dict(train_loss=single_loss.item(), train_utility=np.mean(fitness)), f)
-                    f.write("\n")
-            return np.array(fitness), torch.stack(loss_list), edge_logits
-        
-                
-        # init GA
-        swarm = self._swarm
-        logger = self._logger
-        num_paras = len(self._swarm.connection_dist.order_params) + len(self._swarm.connection_dist.node_features.reshape(-1))
-        print(f"Number of parameters for GARL to optimize: {num_paras}")
-        ga = GARL(func=utility_func, n_dim=num_paras, constraint_eq=None, constraint_ueq=None, lb=-1, ub=1,
-                size_pop=10, max_iter=num_iters, prob_mut=0.1, n_processes=10, optimizer=optimizer,
-                utilities=None, swarm=swarm, logger=logger, art_dir_name=self._art_dir_name)
-        
-        # edge_probs        
-        parameters = await ga.run()
-        
-        order_params = parameters[:num_nodes] # type: ignore
-        # create node features
-        node_features = torch.tensor(parameters[num_nodes:].reshape(num_nodes, -1), device=self.device, dtype=torch.float32) # type: ignore
-        # self._swarm.connection_dist.edge_logits = edge_probs
-        self._swarm.connection_dist.order_params = order_params
-        self._swarm.connection_dist.node_features = node_features
-        print("GARL Done!")
+        ################################## Find and Set MDP (environment constructor) ########################
+        env_constructor = EnvConstructor(args.env_name, args.frameskip)
 
-        # if edge_probs is not None:
-        #     self._print_conns(edge_probs, save_to_file=True)
-        
-        
 
-        print("Done!")
-        # edge_probs = torch.sigmoid(self._swarm.connection_dist.edge_logits)
-        return parameters # type: ignore
+        #######################  Actor, Critic and ValueFunction Model Constructor ######################
+        model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, args.hidden_size)
+        
+        ai = ERL_Trainer(args, model_constructor, env_constructor)
+        ai.train(num_iters)

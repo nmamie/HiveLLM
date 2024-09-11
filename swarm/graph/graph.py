@@ -8,6 +8,8 @@ from copy import deepcopy
 from abc import ABC, abstractmethod
 import async_timeout
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 from swarm.graph.visualize import GPTSwarmVis
 from swarm.memory import GlobalMemory
@@ -184,7 +186,128 @@ class Graph(ABC):
         else:
             if len(final_answers) == 0:
                 final_answers.append("No answer since there are no inputs provided")
-            return final_answers
+            return final_answers        
+        
+    async def reset(self,
+                    node_features: torch.Tensor,
+                    node2idx: Dict[str, int]) -> torch.Tensor:
+        def is_node_useful(node):
+            if node in self.output_nodes:
+                return True
+            
+            for successor in node.successors:
+                if is_node_useful(successor):
+                    return True
+            return False
+        
+        useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
+        in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in useful_node_ids}
+        zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
+        
+        current_node_id = zero_in_degree_queue.pop(0)
+        state = node_features[node2idx[current_node_id]]
+        return state, current_node_id
+    
+    
+    async def step(self, dataset: List[Dict[str, Any]],
+                      record: Dict[str, Any],
+                  max_tries: int = 3, 
+                  max_time: int = 600, 
+                  return_all_outputs: bool = False,
+                  current_node_id: Optional[str] = None,
+                  node_features: Optional[torch.Tensor] = None,
+                  node2idx: Optional[Dict[str, int]] = None,
+                  action: Optional[int] = None,
+                  inference: bool = False) -> List[Any]:
+ 
+        def is_node_useful(node):
+            if node in self.output_nodes:
+                return True
+            
+            for successor in node.successors:
+                if is_node_useful(successor):
+                    return True
+            return False
+        
+        inputs = dataset.record_to_swarm_input(record)
+        correct_answer = dataset.record_to_target_answer(record)
+        
+        for i, input_node in enumerate(self.input_nodes):
+            node_input = deepcopy(inputs)
+            input_node.inputs = [node_input]
+        
+        final_answers = []
+        next_state = node_features[action]
+        
+        # policy step
+        current_node = self.nodes[current_node_id]
+        if current_node in self.output_nodes:
+            terminate = True
+        # else:
+        #     state = node_features[node2idx[current_node_id]]
+        #     _, node_features, attention = policy(node_features, edge_index)
+        # # find highest attention node from the successors
+        # max_attention = 0
+        # for successor in current_node.successors:
+        #     if successor.id in useful_node_ids:
+        #         if attention[node2idx[successor.id]] > max_attention:
+        #             max_attention = attention[node2idx[successor.id]]
+        #             current_node_id = successor.id # action is to move to the node with highest attention
+        # action = torch.tensor([node2idx[current_node_id]], dtype=torch.long)
+        # next_state = node_features[node2idx[current_node_id]]
+        
+        tries = 0
+        while tries < max_tries:
+            try:
+                await asyncio.wait_for(current_node.execute(), timeout=max_time)
+                break
+            except asyncio.TimeoutError:
+                print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
+            except Exception as e:
+                print(f"Error during execution of node {current_node_id}: {e}")
+                break
+            tries += 1
+
+        # for successor in current_node.successors:
+        #     if successor.id in useful_node_ids:
+        #         in_degree[successor.id] -= 1
+        #         if in_degree[successor.id] == 0:
+        #             zero_in_degree_queue.append(successor.id)
+
+    
+        if current_node in self.output_nodes:
+            output_messages = current_node.outputs
+            
+            if len(output_messages) > 0 and not return_all_outputs:
+                final_answer = output_messages[-1].get("output", output_messages[-1])
+                final_answer_post = dataset.postprocess_answer(final_answer)
+                if final_answer_post == correct_answer:
+                    reward = 100
+                else:
+                    reward = -100
+            else:
+                reward = 0
+                for output_message in output_messages:
+                    final_answer = output_message.get("output", output_message)
+                    final_answers.append(final_answer)
+                    final_answer_post = dataset.postprocess_answer(final_answer)
+                    if final_answer_post == correct_answer:
+                        reward += 100
+                    else:
+                        reward -= 100
+                        
+        else:
+            # check answer of current node to get reward
+            current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
+            current_answer_post = dataset.postprocess_answer(current_answer)
+            if current_answer_post == correct_answer:
+                reward = 0
+            else:
+                reward = -1
+        
+        if len(final_answers) == 0:
+            final_answers.append("No answer since there are no inputs provided")
+        return next_state, reward, terminate, final_answers, current_node_id
             
 
     def find_node(self, id: str):

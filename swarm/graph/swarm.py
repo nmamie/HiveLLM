@@ -150,7 +150,7 @@ class Swarm:
         if display:
             _graph.display(draw=self.open_graph_as_html)
 
-        final_answer = asyncio.run(_graph.run(inputs, inference=inference))
+        final_answer = asyncio.run_evo(_graph.run(inputs, inference=inference))
 
         return final_answer
 
@@ -168,6 +168,6 @@ class Swarm:
 
         _graph.display(draw=self.open_graph_as_html)
 
-        final_answer = await _graph.run(inputs, inference=inference)
+        final_answer = await _graph.run_evo(inputs, inference=inference)
 
         return final_answer

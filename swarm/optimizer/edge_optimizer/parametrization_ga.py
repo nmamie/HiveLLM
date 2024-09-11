@@ -240,7 +240,7 @@ class EdgeWiseDistribution(ConnectDistribution):
         #     return _graph, torch.tensor([0.0]), torch.tensor([0.0]), torch.tensor([0.0])
                 
         # with torch.no_grad():
-        edge_logits = self.gat(x, edge_index, query)
+        edge_logits, _, _ = self.gat(x, edge_index, query)
         edge_logits = edge_logits.cpu()
         # edge_probs = self.link_predictor(node_embeddings[self.edge_index[0]], node_embeddings[self.edge_index[1]])
         # # calculate cosine similarity
@@ -260,6 +260,9 @@ class EdgeWiseDistribution(ConnectDistribution):
         log_probs = [torch.tensor([0.0])]
         # reverse the sigmoid for edge probs, handle the case where edge_probs is 0 or 1
         edge_probs = torch.sigmoid(edge_logits)
+        realized_edges = []
+        node2idx = {}
+        node_id = 0
         print(f"Edge probs after sigmoid: {edge_probs}")
         for i, (potential_connection, edge_logit) in enumerate(zip(self.potential_connections, edge_logits)):
             out_node = _graph.find_node(potential_connection[0])
@@ -268,22 +271,25 @@ class EdgeWiseDistribution(ConnectDistribution):
             if not out_node or not in_node:
                 continue
 
-            if not _graph.check_cycle(in_node, {out_node}, set()):
-                edge_prob = torch.sigmoid(edge_logit / temperature)
-                # if is_edge:
-                #     out_node.add_successor(in_node)
-                #     in_node.add_predecessor(out_node)
-                if threshold > 0.0:
-                    edge_prob = torch.tensor(1 if edge_prob > threshold else 0)
-                if torch.rand(1) < edge_prob:
-                    out_node.add_successor(in_node)
-                    # in_node.add_predecessor(out_node)
-                    log_probs.append(torch.log(edge_prob))
-                else:
-                    log_probs.append(torch.log(1 - edge_prob))
+            # if not _graph.check_cycle(in_node, {out_node}, set()):
+            edge_prob = torch.sigmoid(edge_logit / temperature)
+            # if is_edge:
+            #     out_node.add_successor(in_node)
+            #     in_node.add_predecessor(out_node)
+            if threshold > 0.0:
+                edge_prob = torch.tensor(1 if edge_prob > threshold else 0)
+            if torch.rand(1) < edge_prob:
+                out_node.add_successor(in_node)
+                realized_edges.append(potential_connection)
+                node2idx[out_node.id] = node_id
+                node_id += 1
+                # in_node.add_predecessor(out_node)
+                log_probs.append(torch.log(edge_prob))
+            else:
+                log_probs.append(torch.log(1 - edge_prob))
         
         if threshold > 0.0:
             log_probs = torch.tensor([0.0])
         else:
             log_probs = torch.sum(torch.stack(log_probs))
-        return _graph, edge_probs, log_probs, edge_logits
+        return _graph, edge_probs, log_probs, edge_logits, realized_edges, node2idx

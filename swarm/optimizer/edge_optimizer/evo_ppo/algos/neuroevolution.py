@@ -272,3 +272,12 @@ class SSNE:
 			if net_i not in new_elitists:  # Spare the new elitists
 				if random.random() < self.args.mutation_prob:
 					self.mutate_inplace(pop[net_i])
+
+
+
+
+
+
+
+
+
