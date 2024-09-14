@@ -1,12 +1,10 @@
-
 import numpy as np, os, time, random, torch, sys
-from algos.neuroevolution import SSNE
-from core import utils
-from core.runner import rollout_worker
+from swarm.optimizer.edge_optimizer.evo_ppo.algos.neuroevolution import SSNE
+from swarm.optimizer.edge_optimizer.evo_ppo.core import utils
+from swarm.optimizer.edge_optimizer.evo_ppo.core.runner import rollout_worker
 from torch.multiprocessing import Process, Pipe, Manager
-from core.buffer import Buffer
+from swarm.optimizer.edge_optimizer.evo_ppo.core.buffer import Buffer
 import torch
-
 
 class ERL_Trainer:
 
@@ -30,10 +28,10 @@ class ERL_Trainer:
 
 		#PG Learner
 		if env_constructor.is_discrete:
-			from algos.ddqn import DDQN
+			from swarm.optimizer.edge_optimizer.evo_ppo.algos.ddqn import DDQN
 			self.learner = DDQN(args, model_constructor)
 		else:
-			from algos.sac import SAC
+			from swarm.optimizer.edge_optimizer.evo_ppo.algos.sac import SAC
 			self.learner = SAC(args, model_constructor)
 
 		#Replay Buffer
@@ -72,6 +70,8 @@ class ERL_Trainer:
 
 		#Trackers
 		self.best_score = -float('inf'); self.gen_frames = 0; self.total_frames = 0; self.test_score = None; self.test_std = None
+  
+		print("ERL Trainer Initialized")
 
 
 	def forward_generation(self, gen, tracker):

@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
-from core.utils import soft_update, hard_update
+from swarm.optimizer.edge_optimizer.evo_ppo.core.utils import soft_update, hard_update
 
 
 class SAC(object):

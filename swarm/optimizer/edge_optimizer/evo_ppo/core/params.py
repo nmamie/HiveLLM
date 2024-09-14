@@ -11,10 +11,18 @@ class Parameters:
         Returns:
             None
         """
+        
+        # Experiment args
+        self.mode = vars(parser.parse_args())['mode']
+        self.debug = vars(parser.parse_args())['debug']
+        self.model_name = vars(parser.parse_args())['model_name']
+        self.num_truthful_agents = vars(parser.parse_args())['num_truthful_agents']
+        self.domain = vars(parser.parse_args())['domain']
+        self.num_iterations = vars(parser.parse_args())['num_iterations']        
 
         #Env args
         self.env_name = vars(parser.parse_args())['env']
-        self.frameskip = vars(parser.parse_args())['frameskip']
+        # self.frameskip = vars(parser.parse_args())['frameskip']
 
         self.total_steps = int(vars(parser.parse_args())['total_steps'] * 1000000)
         self.gradperstep = vars(parser.parse_args())['gradperstep']

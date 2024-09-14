@@ -8,10 +8,11 @@ class EnvConstructor:
 
 
     """
-    def __init__(self, dataset, loader, num_pot_edges, num_nodes, num_node_features, batch_size):
+    def __init__(self, swarm, dataset, loader, num_pot_edges, num_nodes, num_node_features, node_features, node2idx, edge_index, batch_size):
         """
         A general Environment Constructor
         """
+        self.swarm = swarm
         self.is_discrete = True
         self.dataset = dataset
         self.loader = loader
@@ -20,9 +21,12 @@ class EnvConstructor:
         self.num_node_features = num_node_features
         self.batch_size = batch_size
         self.current_node_id = None
+        self.node_features = node_features
+        self.node2idx = node2idx
+        self.edge_index = edge_index
         
         #State and Action Parameters
-        self.state_dim = self.num_nodes * self.num_node_features
+        self.state_dim = self.num_node_features
         if self.is_discrete:
             self.action_dim = self.num_nodes
 
@@ -30,5 +34,5 @@ class EnvConstructor:
         """
         Generate and return an env object
         """
-        env = GymWrapper(self.dataset, self.loader, self.num_pot_edges, self.num_nodes, self.num_node_features, self.batch_size)
+        env = GymWrapper(self.swarm, self.dataset, self.loader, self.num_pot_edges, self.num_nodes, self.num_node_features, self.node_features, self.node2idx, self.edge_index, self.batch_size)
         return env

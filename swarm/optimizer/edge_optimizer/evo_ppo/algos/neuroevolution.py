@@ -1,15 +1,15 @@
 import random
 import numpy as np
 import math
-import core.utils as utils
+import swarm.optimizer.edge_optimizer.evo_ppo.core.utils as utils
 
 class SSNE:
 
 	def __init__(self, args):
 		self.gen = 0
-		self.args = args;
+		self.args = args
 		self.population_size = self.args.pop_size
-		self.writer = args.writer
+		self.writer = self.args.writer
 
 		#RL TRACKERS
 		self.rl_policy = None

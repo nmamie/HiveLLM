@@ -2,7 +2,93 @@ import torch, random
 import torch.nn as nn
 from torch.distributions import  Normal, RelaxedOneHotCategorical, Categorical
 import torch.nn.functional as F
+from torch.nn import Dropout, Linear
 
+from torch_geometric.nn.conv import GATConv
+
+from swarm.optimizer.edge_optimizer.graph_net.layers import GraphAttentionLayer
+
+from transformers import BertModel, BertTokenizer
+
+
+# Load pre-trained BERT model and tokenizer
+# Using a distilled BERT model (smaller and faster with fewer parameters)
+bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda') # type: ignore
+tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
+
+# Freeze BERT model parameters
+for param in bert.parameters():
+    param.requires_grad = False
+
+
+class CategoricalGATPolicy(nn.Module):
+
+    """Critic model
+
+        Parameters:
+              args (object): Parameter class
+
+    """
+    
+    def __init__(self, num_node_features, action_dim, hidden_channels, num_heads=8):
+        super(CategoricalGATPolicy, self).__init__()
+        
+        self.num_node_features = num_node_features
+        self.hidden_channels = hidden_channels
+        self.action_dim = action_dim
+        
+        self.conv1 = GATConv(num_node_features, hidden_channels, heads=num_heads, dropout=0.6)
+        self.conv2 = GATConv(hidden_channels * num_heads, 1, dropout=0.6, heads=1, concat=False)
+        self.fc0 = Linear(768, num_node_features)
+        # self.fc1 = Linear(num_node_features * 2, num_node_features)                
+        
+            
+    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True):
+        
+        edge_index = edge_index
+        
+        # print("Inputs:", x)
+        
+        # # normalize node features
+        # x = F.normalize(x, p=2, dim=-1)
+        
+        inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True)
+        with torch.no_grad():
+            sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
+            sentence_embedding = sentence_embedding.squeeze(0)
+            print("Sentence embedding:", sentence_embedding)
+        
+        # sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
+        # x = torch.cat([x, sentence_embedding_repeat], dim=1)
+        sentence_embedding = self.fc0(sentence_embedding)
+        x_enc = x + sentence_embedding
+                
+        # Pass through the GAT layers
+        x = self.conv1(x_enc, edge_index)
+        x = F.elu(x)
+        logits, attention = self.conv2(x, edge_index, return_attention_weights=True)
+                
+        # print(f"Node embeddings: {x}")
+        
+        if return_only_action:
+            return logits.argmax(0)
+        
+        return None, None, logits
+
+
+    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True):
+        _, _, logits = self.clean_action(x, edge_index, sentence, return_only_action=False)
+
+        dist = Categorical(logits=logits)
+        action = dist.sample()
+        action = action
+
+        if return_only_action:
+            return action
+
+        return action, None, logits
+    
+    
 class CategoricalPolicy(nn.Module):
 
     """Critic model

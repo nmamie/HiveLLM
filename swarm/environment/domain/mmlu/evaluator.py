@@ -64,7 +64,7 @@ class Evaluator():
         
         self.args = args
 
-    async def evaluate_direct_answer(self,
+    def evaluate_direct_answer(self,
             limit_questions: Optional[int] = None,
             ) -> float:
 
@@ -85,7 +85,7 @@ class Evaluator():
             input_dict = dataset.record_to_swarm_input(record)
             print(input_dict)
 
-            raw_answer = await io_agent.run(input_dict)
+            raw_answer = io_agent.run(input_dict)
 
             print("Raw answer:", raw_answer)
             answer = dataset.postprocess_answer(raw_answer)
@@ -104,7 +104,7 @@ class Evaluator():
         print("Done!")
         return accuracy.get()
 
-    async def evaluate_swarm(
+    def evaluate_swarm(
             self,
             mode: Union[
                 Literal['full_connected_swarm'],
@@ -158,7 +158,7 @@ class Evaluator():
 
             start_ts = time.time()
 
-            future_answers = []
+            raw_answers = []
             for record in record_batch:
                 if mode == 'external_edge_probs':
                     self._swarm.connection_dist.gat.eval()
@@ -173,10 +173,10 @@ class Evaluator():
                 input_dict = dataset.record_to_swarm_input(record)
                 print(input_dict)
 
-                future_answer = self._swarm.arun(input_dict, realized_graph, inference=True)
-                future_answers.append(future_answer)
+                raw_answer = self._swarm.run(input_dict, realized_graph, inference=True)
+                raw_answers.append(raw_answer)
 
-            raw_answers = await asyncio.gather(*future_answers)
+            # raw_answers = await asyncio.gather(*future_answers)
 
             print(f"Batch time {time.time() - start_ts:.3f}")
 
@@ -222,12 +222,12 @@ class Evaluator():
                 with open(txt_name, "w") as f:
                     f.writelines(msgs)
 
-    async def optimize_swarm(
+    def optimize_swarm(
             self,
             num_iters: int,
-            lr: float,
+            lr: float = 1e-3,
             batch_size: int = 1,
-            ) -> torch.Tensor:
+            ):
 
         assert self._swarm is not None
 
@@ -261,14 +261,14 @@ class Evaluator():
         # node and edge statistics
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
-        num_node_features = self._swarm.connection_dist.node_features.shape[0] + self._swarm.connection_dist.node_features.shape[1]
+        num_node_features = 64
         
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(loader, num_pot_edges, num_nodes, num_node_features)
+        env_constructor = EnvConstructor(self._swarm, dataset, loader, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.edge_index, batch_size)
 
 
         #######################  Actor, Critic and ValueFunction Model Constructor ######################
-        model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, args.hidden_size)
+        model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, self.args.hidden_size)
         
         ai = ERL_Trainer(self.args, model_constructor, env_constructor)
-        ai.train(num_iters)
+        ai.train(self.args.total_steps)

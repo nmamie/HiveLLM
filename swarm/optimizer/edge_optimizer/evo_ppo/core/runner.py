@@ -1,17 +1,18 @@
 
-from core import utils as utils
+from swarm.optimizer.edge_optimizer.evo_ppo.core import utils as utils
 import numpy as np
 import torch
+from copy import deepcopy
 
 
 # Rollout evaluate an agent in a complete game
 @torch.no_grad()
 def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, env_constructor):
-
-
-
+    
     env = env_constructor.make_env()
     np.random.seed(id) ###make sure the random seeds across learners are different
+    
+    edge_index = env.edge_index
 
     ###LOOP###
     while True:
@@ -23,20 +24,20 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
 
         fitness = 0.0
         total_frame = 0
-        state = env.reset()
+        state, record = env.reset()
         rollout_trajectory = []
-        state = utils.to_tensor(state)
+        # state = utils.to_tensor(state)
         while True:  # unless done
-
-            if type == 'pg': action = net.noisy_action(state)
-            else: action = net.clean_action(state)
-
-            action = utils.to_numpy(action)
-            next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
-
-            next_state = utils.to_tensor(next_state)
+            sentence = record['question']
+            if type == 'pg': action = net.noisy_action(state, edge_index, sentence)  # Choose an action from the policy network
+            else: action = net.clean_action(state, edge_index, sentence)
+            
+            # action = utils.to_numpy(action)
+            next_state, reward, done, info, record = env.step(action.flatten(), state)  # Simulate one step in environment
+            
+            # next_state = utils.to_tensor(next_state)
             fitness += reward
-
+            
             # If storing transitions
             if store_data: #Skip for test set
                 rollout_trajectory.append([utils.to_numpy(state), utils.to_numpy(next_state),

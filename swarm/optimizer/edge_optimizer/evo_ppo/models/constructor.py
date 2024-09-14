@@ -19,7 +19,7 @@ class ModelConstructor:
         """
 
         if type == 'Gaussian_FF':
-            from models.continous_models import Gaussian_FF
+            from swarm.optimizer.edge_optimizer.evo_ppo.models.continous_models import Gaussian_FF
             model = Gaussian_FF(self.state_dim, self.action_dim, self.hidden_size)
             if seed:
                 model.load_state_dict(torch.load(self.critic_seed))
@@ -27,19 +27,19 @@ class ModelConstructor:
 
 
         elif type == 'Tri_Head_Q':
-            from models.continous_models import Tri_Head_Q
+            from swarm.optimizer.edge_optimizer.evo_ppo.models.continous_models import Tri_Head_Q
             model = Tri_Head_Q(self.state_dim, self.action_dim, self.hidden_size)
             if seed:
                 model.load_state_dict(torch.load(self.critic_seed))
                 print('Critic seeded from', self.critic_seed)
 
         elif type == 'GumbelPolicy':
-            from models.discrete_models import GumbelPolicy
+            from swarm.optimizer.edge_optimizer.evo_ppo.models.discrete_models import GumbelPolicy
             model = GumbelPolicy(self.state_dim, self.action_dim, self.hidden_size)
 
         elif type == 'CategoricalPolicy':
-            from models.discrete_models import CategoricalPolicy
-            model = CategoricalPolicy(self.state_dim, self.action_dim, self.hidden_size)
+            from swarm.optimizer.edge_optimizer.evo_ppo.models.discrete_models import CategoricalGATPolicy
+            model = CategoricalGATPolicy(self.state_dim, self.action_dim, self.hidden_size)
 
 
         else:

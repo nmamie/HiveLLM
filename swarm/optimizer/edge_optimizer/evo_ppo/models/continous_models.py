@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Normal, RelaxedOneHotCategorical
-from core.utils import weights_init_
+from swarm.optimizer.edge_optimizer.evo_ppo.core.utils import weights_init_
 import torch.nn.functional as F
 
 def weights_init_(m, lin_gain=1.0, bias_gain=0.1):
