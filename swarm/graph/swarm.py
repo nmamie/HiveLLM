@@ -9,7 +9,7 @@ import torch
 import copy
 
 from swarm.environment.operations.final_decision import FinalDecision, MergingStrategy
-from swarm.optimizer.edge_optimizer.parametrization_ga import EdgeWiseDistribution
+from swarm.optimizer.edge_optimizer.parameterization import EdgeWiseDistribution
 from swarm.memory import GlobalMemory
 from swarm.graph.composite_graph import CompositeGraph
 from swarm.utils.log import logger

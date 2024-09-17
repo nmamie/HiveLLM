@@ -88,7 +88,7 @@ class DirectAnswer(Node):
             message = [Message(role="system", content=f"You are {role}. {constraint}"),
                        Message(role="user", content=prompt)]
 
-            response = await self.llm.agen(message, max_tokens=self.max_token)
+            response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
                                     
             execution = {
                 "operation": self.node_name,

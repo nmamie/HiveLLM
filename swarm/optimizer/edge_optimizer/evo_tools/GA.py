@@ -6,6 +6,7 @@
 
 import random
 import numpy as np
+from sympy import div
 import torch
 from .base import SkoBase
 from .tools import func_transformer
@@ -57,6 +58,11 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
 
         self.all_history_Y = []
         self.all_history_FitV = []
+        self.all_history_mean_Y = []
+        self.all_history_X = []
+        self.all_history_mean_X = []
+        self.all_history_diversity = []
+        self.all_history_mean_diversity = []
 
         self.mean_x, self.mean_y = None, None
         self.best_x, self.best_y = None, None
@@ -102,9 +108,8 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         best = []
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
-        num_node_features = torch.numel(self._swarm.connection_dist.node_features)
-        for i in range(self.max_iter):
-            print(f"Iter {i}", 80*'-')
+        for i_iter in range(self.max_iter):
+            print(f"Iter {i_iter}", 80*'-')
             start_ts = time.time()
             
             self.X = self.chrom2x(self.Chrom)
@@ -129,12 +134,48 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             self.Y = await self.x2y()
             # squeeze the fitness value to 1D array
             self.Y = np.squeeze(self.Y)
-            print("Y:", self.Y)
+            print("Y:", self.Y)            
+            
+            # Dynamic exploration-exploitation weighting
+            # personal_weight = 0.6 + i_iter * 0.01  # Exploration weight decreases as generations progress
+            personal_weight = 0.7
+            social_weight = 1.0 - personal_weight
+            
+            # measure diversity of each individual (cosine distance)
+            diversity = []
+            for i in range(self.size_pop):
+                diversity.append(0)
+                for j in range(self.size_pop):
+                    if i == j:
+                        continue
+                    else:
+                        diversity[i] += np.dot(self.X[i], self.X[j]) / (np.linalg.norm(self.X[i]) * np.linalg.norm(self.X[j])) # cosine similarity
+                diversity[i] /= (self.size_pop - 1)
+                diversity[i] = 1 - diversity[i]
+            diversity = np.array(diversity)
+            
+            # add diversity to fitness
+            self.Y += 0.1 * diversity
+
+            # # Normalize fitness values
+            # min_fitness, max_fitness = np.min(self.Y), np.max(self.Y)
+            # if max_fitness > min_fitness:  # Avoid division by zero
+            #     self.Y = [(f - min_fitness) / (max_fitness - min_fitness) for f in self.Y]
+
+            # Calculate swarm fitness
             swarm_fitness = np.mean(self.Y)
-            self.Y = [0.9*f + 0.1*swarm_fitness for f in self.Y] 
+
+            # Adjust individual fitness based on swarm fitness
+            self.Y = [personal_weight * f + social_weight * swarm_fitness for f in self.Y] 
             self.FitV = np.array(self.Y)
-            print('Generation:', i, 'Best FitV:', 100 * self.FitV.max())
-            print('Generation:', i, 'Mean FitV:', 100 * self.FitV.mean())
+
+            # Logging
+            print('Generation:', i_iter, 'Best FitV:', 100 * self.FitV.max())
+            print('Generation:', i_iter, 'Mean FitV:', 100 * self.FitV.mean())
+            print('Generation:', i_iter, 'Diversity Metric (Y):', np.std(self.FitV))
+            print('Generation:', i_iter, 'Diversity Metric (X):', np.mean(diversity))
+
+            # Perform selection, crossover, and mutation
             # self.ranking()
             self.selection()
             self.crossover()
@@ -148,6 +189,11 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             self.generation_best_Y.append(self.Y[generation_best_index])
             self.all_history_Y.append(self.Y)
             self.all_history_FitV.append(self.FitV)
+            self.all_history_mean_Y.append(np.mean(self.Y))
+            self.all_history_X.append(self.X)
+            self.all_history_mean_X.append(np.mean(self.X))
+            self.all_history_diversity.append(diversity)
+            self.all_history_mean_diversity.append(np.mean(diversity))
             
             # output the edge probabilities
             global_best_index = np.array(self.generation_best_Y).argmax()
@@ -161,14 +207,13 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             # update the edge probabilities with fittest individual
             # edge_probs = torch.nn.Parameter(self.best_x[:num_pot_edges])
             # order_params = torch.nn.Parameter(self.best_x[num_pot_edges:])
-            order_params = torch.nn.Parameter(self.best_x[:num_nodes])
+            # order_params = torch.nn.Parameter(self.best_x[:num_nodes])
             # create 32-dimensional node features
-            node_features = torch.tensor(self.best_x[num_nodes:(num_nodes+num_node_features)].reshape(num_nodes, -1), device=self.device, dtype=torch.float32)
-            node_features = torch.nn.Parameter(node_features)
+            edge_logits = torch.nn.Parameter(self.best_x)
             # gat_params = self.best_x[(num_nodes+num_node_features):]
             # self._swarm.connection_dist.edge_logits = edge_probs
-            self._swarm.connection_dist.order_params = order_params
-            self._swarm.connection_dist.node_features = node_features
+            # self._swarm.connection_dist.order_params = order_params
+            self._swarm.connection_dist.edge_logits = edge_logits
             # # update all trainable GAT parameters
             # with torch.no_grad():
             #     train_p = [p for p in self._swarm.connection_dist.gat.parameters() if p.requires_grad]
@@ -183,15 +228,15 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             #         old_p_sizes += p_size
             
             
-            order_probs = torch.nn.Sigmoid()(order_params)
-            print("Order probabilities:")
-            print(order_probs)
+            # order_probs = torch.nn.Sigmoid()(order_params)
+            # print("Order probabilities:")
+            # print(order_probs)
             # print("Edge probabilities:")
             # print(edge_probs)
             # print("Order parameters:")
             # print(order_params)
 
-            # self.print_conns(edge_probs)
+            self.print_conns(edge_logits)
 
             if self.early_stop:
                 best.append(min(self.generation_best_Y))
@@ -204,14 +249,41 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
 
         if self._logger is not None:
             # self._logger.add_scalar("train/loss", total_loss.item(), i_iter)
-            self._logger.add_scalar("train/utility", self.mean_y, i)
+            self._logger.add_scalar("train/utility", self.mean_y, i_iter)
         if self._art_dir_name is not None:
             log_jsonl_name = os.path.join(self._art_dir_name, "training.jsonl")
             with open(log_jsonl_name, "a") as f:
-                json.dump(dict(iter=i, #train_loss=total_loss.item(), 
+                json.dump(dict(iter=i_iter, #train_loss=total_loss.item(), 
                                 train_utility=self.mean_y), f)
                 f.write("\n")
         print("end of iteration")
+        
+        # plot history
+        if self._art_dir_name is not None:
+            import matplotlib.pyplot as plt
+            plt.plot(self.generation_best_Y, label='max Fitness', color='b')
+            plt.plot(self.all_history_mean_Y, label='mean Fitness', color='r')
+            plt.fill_between(range(len(self.all_history_mean_Y)),
+                                np.max(self.all_history_Y, axis=1),
+                                np.min(self.all_history_Y, axis=1), color='g', alpha=0.3)
+            plt.title('Fitness of the population in each generation')
+            plt.legend()
+            plt.savefig(os.path.join(self._art_dir_name, "fit_history.png"))
+            plt.close()
+            
+            # plt.plot(self.all_history_mean_X, label='mean_X', color='b')
+            # plt.fill_between(range(len(self.all_history_mean_X)),
+            #                     np.max(self.all_history_X, axis=1),
+            #                     np.min(self.all_history_X, axis=1), color='b', alpha=0.3)
+            plt.plot(np.max(self.all_history_diversity, axis=1), label='max Diversity', color='b')
+            plt.plot(self.all_history_mean_diversity, label='mean Diversity', color='r')
+            plt.fill_between(range(len(self.all_history_mean_diversity)),
+                                np.max(self.all_history_diversity, axis=1),
+                                np.min(self.all_history_diversity, axis=1), color='g', alpha=0.3)
+            plt.title('Diversity of the population in each generation')
+            plt.legend()
+            plt.savefig(os.path.join(self._art_dir_name, "diversity_history.png"))
+            plt.close()
         
         return self.best_x
 

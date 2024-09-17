@@ -4,7 +4,7 @@ import argparse
 
 from swarm.graph.swarm import Swarm
 from swarm.environment.operations.final_decision import MergingStrategy
-from experiments.evaluator.evaluator_rl_ga import Evaluator
+from experiments.evaluator.evaluator_ga import Evaluator
 from experiments.evaluator.datasets.mmlu_dataset import MMLUDataset
 from dataset.MMLU.download import download
 
@@ -19,8 +19,8 @@ def parse_args():
     parser.add_argument('--num-truthful-agents', type=int, default=1,
                         help="Number of truthful agents. The total will be N truthful and N adversarial.")
 
-    parser.add_argument('--num-iterations', type=int, default=100,
-                        help="Number of optimization iterations. Default 100.")
+    parser.add_argument('--num-iterations', type=int, default=30,
+                        help="Number of optimization iterations. Default 30.")
 
     parser.add_argument('--model_name', type=str, default="inference",
                         help="Model name, None runs the default ChatGPT4. Custom runs HF model. Inference runs the Meta-LLama-3.1-8B-Instruct model.")
@@ -60,9 +60,12 @@ async def main():
     else:
         N = args.num_truthful_agents
         M = N
-        agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
+        # agent_name_list = N * ["SpecialistAgent"] + M * ["AdversarialAgent"]
+        agent_name_list = N * ["SpecialistAgent"]
 
-        swarm_name = f"{N}true_{M}adv"
+        # swarm_name = f"{N}true_{M}adv"
+        swarm_name = f"{N}specialist"
+        
 
         swarm = Swarm(
             agent_name_list,
@@ -115,7 +118,7 @@ async def main():
 
         num_iters = 5 if debug else args.num_iterations
 
-        lr = 0.01
+        lr = 0.1
 
         edge_probs = await evaluator.optimize_swarm(num_iters=num_iters, lr=lr)
 

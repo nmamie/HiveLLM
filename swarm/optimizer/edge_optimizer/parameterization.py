@@ -39,8 +39,8 @@ class EdgeWiseDistribution(ConnectDistribution):
         node_ids = set([x for pair in potential_connections for x in pair])
         self.node_idx2id = {i: node_id for i, node_id in enumerate(node_ids)}
         self.node_id2idx = {node_id: i for i, node_id in enumerate(node_ids)}
-        order_tensor = torch.randn(len(node_ids))
-        self.order_params = torch.nn.Parameter(order_tensor)
+        # order_tensor = torch.randn(len(node_ids))
+        # self.order_params = torch.nn.Parameter(order_tensor)
         
     def random_sample_num_edges(self, graph: CompositeGraph, num_edges: int) -> CompositeGraph:
         _graph = deepcopy(graph)
@@ -104,18 +104,20 @@ class EdgeWiseDistribution(ConnectDistribution):
             addable_if_use_learned_order = use_learned_order and (ranks[out_node.id] < ranks[in_node.id])
             addable_if_not_used_learned_order = (not use_learned_order) and (not _graph.check_cycle(in_node, {out_node}, set()))
             if addable_if_not_used_learned_order or addable_if_use_learned_order:
-                edge_prob = torch.sigmoid(edge_logit / temperature)
+                # edge_prob = torch.sigmoid(edge_logit / temperature)
+                edge_prob = edge_logit
                 if threshold:
                     edge_prob = torch.tensor(1 if edge_prob > threshold else 0)
-                if torch.rand(1) < edge_prob:
+                # if torch.rand(1) < edge_prob:
+                if 0.5 < edge_prob:
                     out_node.add_successor(in_node)
                     # in_node.add_predecessor(out_node)
                     log_probs.append(torch.log(edge_prob))
                 else:
                     log_probs.append(torch.log(1 - edge_prob))
 
-        log_prob = torch.sum(torch.stack(log_probs))
-        return _graph, log_prob
+        # log_prob = torch.sum(torch.stack(log_probs))
+        return _graph, log_probs
 
     def realize_full(self, graph: CompositeGraph) -> CompositeGraph:
         _graph = deepcopy(graph)

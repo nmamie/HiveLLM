@@ -123,7 +123,8 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
 
             self.optimizer.zero_grad()
             self.Y, loss_list, edge_logits = await self.x2y()
-            total_loss = torch.mean(loss_list) + 0.01 * (edge_logits**2).mean()
+            # total_loss = torch.mean(loss_list) + 0.01 * (edge_logits**2).mean()
+            total_loss = torch.mean(loss_list)
             total_loss.backward()
             # divide all the gradients by the size of the population
             # for param in self._swarm.connection_dist.parameters():

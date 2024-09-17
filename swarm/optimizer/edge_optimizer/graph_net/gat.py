@@ -40,10 +40,10 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         self.hidden_channels = hidden_channels
         self.sentence_embedding_dim = sentence_embedding_dim
         
-        self.conv1 = GATConv(num_node_features, hidden_channels, heads=num_heads, dropout=0.6)
-        self.conv2 = GATConv(hidden_channels * num_heads, num_node_features, dropout=0.6, heads=num_heads, concat=False)
+        self.conv1 = GATConv(sentence_embedding_dim * 2, hidden_channels, heads=num_heads, dropout=0.6)
+        self.conv2 = GATConv(hidden_channels * num_heads, num_node_features, heads=num_heads, dropout=0.6, concat=False)
         self.fc0 = Linear(768, sentence_embedding_dim)
-        self.fc1 = Linear(sentence_embedding_dim * 2, num_node_features)
+        # self.fc1 = Linear(sentence_embedding_dim * 2, num_node_features)
         self.fc2 = Linear(num_node_features * 2, num_node_features)
         self.fc3 = Linear(num_node_features, 1) # logistic regression
                 
@@ -72,39 +72,56 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         with torch.no_grad():
             sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
             sentence_embedding = sentence_embedding.squeeze(0)
-            sentence_embedding = self.fc0(sentence_embedding)
-            # print("Sentence embedding:", sentence_embedding)
             
         # print("Node features shape:", x.shape)
         # print("Edge index shape:", edge_index.shape)
         # print("Sentence embedding shape:", sentence_embedding.shape)
         
+        sentence_embedding = self.fc0(sentence_embedding)
         sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
         x = torch.cat([x, sentence_embedding_repeat], dim=1)
-        x_reduced = self.fc1(x)
+        # x = x + sentence_embedding
+        # x_reduced = self.fc1(x)
         # x_reconstructed = self.fc2(x_reduced)
         # print("Reduced node features:", x_reduced)
                 
         # Pass through the GAT layers
-        x, attention = self.conv1(x_reduced, edge_index, return_attention_weights=True)
+        x = self.conv1(x, edge_index)
         x = F.elu(x)
         # print(f"Node embeddings after first conv: {x}")
         # print(f"Attention first conv: {attention}")
-        x, attention = self.conv2(x, edge_index.to(self.device), return_attention_weights=True)                
+        x, attention = self.conv2(x, edge_index.to(self.device), return_attention_weights=True)            
         
         # print(f"Attention second conv: {attention}")
 
         
         print(f"Node embeddings: {x}")
         
+        # average attention over all heads
+
+        print(f"Attention: {attention[1]}")
+        
+        # Get node embeddings for each edge (source and target nodes)
         x_i, x_j = x[edge_index[0]], x[edge_index[1]]
-        edge_input = torch.cat([x_i, x_j], dim=1)
-        
-        edge_logits = nn.ReLU()(self.fc2(edge_input))
-        edge_logits = nn.Dropout(0.2)(edge_logits)
-        edge_logits = self.fc3(edge_logits)
-        print(f"Edge logits: {edge_logits}")
-        
+
+        # Concatenate the node embeddings of source and target nodes for each edge
+        edge_input = torch.cat([x_i, x_j], dim=1)  # This will result in shape (num_edges, 2 * embedding_dim)
+
+        # Pass through neural network layers for edge prediction
+        edge_logits = self.fc2(edge_input)  # Assuming fc2 is defined correctly
+        edge_logits = nn.ReLU()(edge_logits)
+
+        # Optionally apply Dropout for regularization (good during training)
+        edge_logits = nn.Dropout(0.2)(edge_logits)  # Enable this if needed
+
+        # Final layer for binary classification
+        edge_logits = self.fc3(edge_logits)  # Assuming fc3 is defined correctly
+        print(f"Edge logits (pre-sigmoid): {edge_logits}")
+
+        # Apply sigmoid to get probabilities
+        edge_probs = torch.sigmoid(edge_logits)  # This gives values between 0 and 1
+        print(f"Edge probabilities (post-sigmoid): {edge_probs}")
+                
         # # define edge probabilities as attention weights
         # attention_scores = []
         # # filter out self-loops using edge_index
@@ -120,7 +137,7 @@ class GATWithSentenceEmbedding(torch.nn.Module):
         # if min_val < 0 or max_val > 1:
         #     attention_scores = (attention_scores - min_val) / (max_val - min_val + 1e-8)     
         
-        return edge_logits
+        return edge_probs
     
 class LinkPredictor(torch.nn.Module):
     def __init__(self, in_channels):

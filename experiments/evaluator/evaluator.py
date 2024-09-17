@@ -271,10 +271,23 @@ class Evaluator():
                 utilities.append(utility)
                 single_loss = - log_prob * utility
                 loss_list.append(single_loss)
+                
+            reward_baseline = torch.tensor(utilities)
+            reward_mean = reward_baseline.mean()
+            reward_std = reward_baseline.std()
+
+            # Prevent division by zero
+            if reward_std > 0:
+                normalized_rewards = (reward_baseline - reward_mean) / (reward_std + 1e-8)
+            else:
+                normalized_rewards = reward_baseline - reward_mean
 
             print("utilities:", utilities)
+            print("normalized_rewards:", normalized_rewards)
             mean_utility = np.mean(np.array(utilities))
-            total_loss = torch.mean(torch.stack(loss_list))
+            # total_loss = torch.mean(torch.stack(loss_list))
+            # Compute loss with normalized rewards
+            total_loss = (-torch.stack(log_probs) * normalized_rewards).mean()
 
             print("loss:", total_loss.item())
             optimizer.zero_grad()

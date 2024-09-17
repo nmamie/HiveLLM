@@ -78,7 +78,8 @@ class AdversarialAnswer(Node):
             role, constraint, prompt= self.meta_prompt(input, meta_init=False)
             message = [Message(role="system", content=f"You are {role}. {constraint}"),
                     Message(role="user", content=prompt)]
-            response = await self.llm.agen(message)
+            response = await self.llm.agen(message, temperature=0.2)
+            # response = "I am an adversarial agent."
             
             _memory = {
                 "operation": self.node_name,

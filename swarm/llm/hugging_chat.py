@@ -18,6 +18,7 @@ from swarm.llm.llm_registry import LLMRegistry
 
 import torch
 import transformers
+# from optimum.nvidia.pipelines import pipeline
 from transformers import AutoTokenizer, LlamaForCausalLM, AutoModelForCausalLM
 from accelerate import Accelerator
 

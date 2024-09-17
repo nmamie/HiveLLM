@@ -119,10 +119,10 @@ class Evaluator():
         if mode == 'full_connected_swarm':
             realized_graph = self._swarm.connection_dist.realize_full(self._swarm.composite_graph)
         elif mode == 'external_edge_probs':
-            # assert edge_probs is not None
-            # edge_mask = edge_probs > 0.5
-            # realized_graph = self._swarm.connection_dist.realize_mask(self._swarm.composite_graph, edge_mask)
-            # realized_graph.display()
+            assert edge_probs is not None
+            edge_mask = edge_probs > 0.5
+            realized_graph = self._swarm.connection_dist.realize_mask(self._swarm.composite_graph, edge_mask)
+            realized_graph.display()
             realized_graph = None
         else:
             realized_graph = None
@@ -219,7 +219,7 @@ class Evaluator():
             self,
             num_iters: int,
             lr: float,
-            batch_size: int = 1,
+            batch_size: int = 4,
             ) -> torch.Tensor:
 
         assert self._swarm is not None
@@ -323,7 +323,10 @@ class Evaluator():
                 current_utilities.append(utility)
                 # self.utilities.append(utility)
                 # single_loss = -log_prob * (utility - 0.4)
-                single_loss = -log_prob * utility
+                # if output_accuracy.get() > utility:
+                #     single_loss = -log_prob * 0
+                # else: single_loss = -log_prob * output_accuracy.get()
+                single_loss = -log_prob * output_accuracy.get()
                 loss_list.append(single_loss)
             fitness.append(np.mean(current_utilities))
             

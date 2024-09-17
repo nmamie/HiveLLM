@@ -216,8 +216,7 @@ class EdgeWiseDistribution(ConnectDistribution):
         # edge_index = _graph_full.get_edge_index()
         # Encode the sentence to obtain its embedding
         
-          
-        x = torch.tensor(deepcopy(node_features), dtype=torch.float, requires_grad=True)
+        x = node_features
         print("Node features shape:", x.shape)
         edge_index = deepcopy(self.edge_index)
         # edge_probs = self.link_predictor(x[self.edge_index[0]], x[self.edge_index[1]], init=True)
@@ -259,8 +258,9 @@ class EdgeWiseDistribution(ConnectDistribution):
         
         log_probs = [torch.tensor([0.0])]
         # reverse the sigmoid for edge probs, handle the case where edge_probs is 0 or 1
-        edge_probs = torch.sigmoid(edge_logits)
-        print(f"Edge probs after sigmoid: {edge_probs}")
+        # edge_probs = torch.sigmoid(edge_logits)
+        edge_probs = edge_logits
+        # print(f"Edge probs after sigmoid: {edge_probs}")
         for i, (potential_connection, edge_logit) in enumerate(zip(self.potential_connections, edge_logits)):
             out_node = _graph.find_node(potential_connection[0])
             in_node = _graph.find_node(potential_connection[1])
@@ -269,7 +269,8 @@ class EdgeWiseDistribution(ConnectDistribution):
                 continue
 
             if not _graph.check_cycle(in_node, {out_node}, set()):
-                edge_prob = torch.sigmoid(edge_logit / temperature)
+                # edge_prob = torch.sigmoid(edge_logit / temperature)
+                edge_prob = edge_logit
                 # if is_edge:
                 #     out_node.add_successor(in_node)
                 #     in_node.add_predecessor(out_node)

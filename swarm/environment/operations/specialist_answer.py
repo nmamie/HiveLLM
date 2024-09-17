@@ -25,28 +25,28 @@ Make a list of 20, list items only, no need for a description.
 
 class SpecialistAnswer(Node): 
     role_list = [
-        # "Botanist",
-        # "Data Scientist",
-        # "Social Worker",
-        # "Journalist",
-        # "Pilot",
-        # "Anthropologist",
-        # "Fitness Coach",
-        # "Politician",
-        # "Artist",
-        # "Marine Biologist",
-        # "Ethicist",
-        # "Entrepreneur",
-        # "Linguist",
-        # "Archaeologist",
-        # "Nurse",
-        # "Graphic Designer",
-        # "Philanthropist",
-        # "Meteorologist",
-        # "Sommelier",
-        # "Cybersecurity Expert"
-        "Historian",
+        "Botanist",
+        "Data Scientist",
+        "Social Worker",
+        "Journalist",
+        "Pilot",
+        "Anthropologist",
+        "Fitness Coach",
+        "Politician",
+        "Artist",
+        "Marine Biologist",
+        "Ethicist",
+        "Entrepreneur",
+        "Linguist",
+        "Archaeologist",
+        "Nurse",
+        "Graphic Designer",
+        "Philanthropist",
+        "Meteorologist",
+        "Sommelier",
+        "Cybersecurity Expert",
         "Mathematician",
+        "Philosopher"
     ]
 
     def __init__(self, 
@@ -121,7 +121,7 @@ Take into account the following opinions which may or may not be true:
 
         message = [Message(role="system", content=system_message),
                     Message(role="user", content=user_message)]
-        response = await self.llm.agen(message, max_tokens=self.max_token)
+        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
 
         execution = {
             "operation": self.node_name,
