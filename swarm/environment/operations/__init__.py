@@ -14,7 +14,7 @@ __all__ = [
     "CombineAnswer",
     "GenerateQuery",
     "DirectAnswer",
-    "SpecialistAnswer"
+    "SpecialistAnswer",
     "FileAnalyse",
     "WebSearch",
     "Reflect",

@@ -76,7 +76,7 @@ class DirectAnswer(Node):
         return pipeline
 
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference: bool = False, **kwargs):
         
         node_inputs = self.process_input(inputs)
         outputs = []
@@ -88,7 +88,7 @@ class DirectAnswer(Node):
             message = [Message(role="system", content=f"You are {role}. {constraint}"),
                        Message(role="user", content=prompt)]
 
-            response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
+            response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2, inference=inference)
                                     
             execution = {
                 "operation": self.node_name,

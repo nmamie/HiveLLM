@@ -59,20 +59,28 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         self.all_history_Y = []
         self.all_history_FitV = []
         self.all_history_mean_Y = []
+        self.all_history_mean_FitV = []
+        self.all_history_leading_FitV = []
         self.all_history_X = []
         self.all_history_mean_X = []
         self.all_history_diversity = []
         self.all_history_mean_diversity = []
+        self.all_history_exec_times = []
+        self.all_history_mean_exec_times = []
 
         self.mean_x, self.mean_y = None, None
         self.best_x, self.best_y = None, None
+        self.max_time = None
 
     @abstractmethod
     def chrom2x(self, Chrom):
         pass
 
     async def x2y(self):
-        self.Y_raw = await self.func(self.X)
+        results = await self.func(self.X)
+        self.Y_raw = [np.array(result[0]) for result in results]
+        exec_times = [np.array(result[1]) for result in results]
+        
         if not self.has_constraint:
             self.Y = self.Y_raw
         else:
@@ -80,7 +88,7 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             penalty_eq = np.array([np.sum(np.abs([c_i(x) for c_i in self.constraint_eq])) for x in self.X])
             penalty_ueq = np.array([np.sum(np.abs([max(0, c_i(x)) for c_i in self.constraint_ueq])) for x in self.X])
             self.Y = self.Y_raw + 1e5 * penalty_eq + 1e5 * penalty_ueq
-        return self.Y
+        return self.Y, exec_times
 
     # @abstractmethod
     # def ranking(self):
@@ -131,14 +139,17 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             #             print("new_p:", p.shape)
             #             old_p_sizes += p_size
 
-            self.Y = await self.x2y()
+            results = await self.x2y()
+            self.Y = results[0]
+            exec_times = results[1]
+            # self.Y, exec_times = results
             # squeeze the fitness value to 1D array
             self.Y = np.squeeze(self.Y)
             print("Y:", self.Y)            
             
             # Dynamic exploration-exploitation weighting
-            # personal_weight = 0.6 + i_iter * 0.01  # Exploration weight decreases as generations progress
-            personal_weight = 0.7
+            personal_weight = 0.6 + i_iter * 0.01  # Exploration weight decreases as generations progress
+            # personal_weight = 0.8
             social_weight = 1.0 - personal_weight
             
             # measure diversity of each individual (cosine distance)
@@ -154,8 +165,20 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
                 diversity[i] = 1 - diversity[i]
             diversity = np.array(diversity)
             
+            # softmax on exec_times
+            exec_times = np.array(exec_times).squeeze()
+            print("Exec times:", exec_times)
+            
+            if self.max_time is None:
+                self.max_time = np.max(exec_times)
+            else:
+                self.max_time = np.max([self.max_time, np.max(exec_times)])
+                
+            soft_exec_times = exec_times / self.max_time
+                    
             # add diversity to fitness
-            self.Y += 0.1 * diversity
+            self.Y -= 0.1 * (1-diversity)
+            self.Y -= 0.2 * soft_exec_times
 
             # # Normalize fitness values
             # min_fitness, max_fitness = np.min(self.Y), np.max(self.Y)
@@ -167,7 +190,11 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
 
             # Adjust individual fitness based on swarm fitness
             self.Y = [personal_weight * f + social_weight * swarm_fitness for f in self.Y] 
-            self.FitV = np.array(self.Y)
+            
+            # ensure that all Y are between 0 and 1
+            self.Y = np.clip(self.Y, 0, 1)
+            
+            self.FitV = np.array(self.Y)       
 
             # Logging
             print('Generation:', i_iter, 'Best FitV:', 100 * self.FitV.max())
@@ -190,10 +217,17 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             self.all_history_Y.append(self.Y)
             self.all_history_FitV.append(self.FitV)
             self.all_history_mean_Y.append(np.mean(self.Y))
+            self.all_history_mean_FitV.append(np.mean(self.FitV))
+            if len(self.all_history_leading_FitV) == 0 or self.FitV.max() > self.all_history_leading_FitV[-1]:
+                self.all_history_leading_FitV.append(self.FitV.max())
+            else: # if the leading one is not updated
+                self.all_history_leading_FitV.append(self.all_history_leading_FitV[-1])
             self.all_history_X.append(self.X)
             self.all_history_mean_X.append(np.mean(self.X))
             self.all_history_diversity.append(diversity)
             self.all_history_mean_diversity.append(np.mean(diversity))
+            self.all_history_exec_times.append(exec_times)
+            self.all_history_mean_exec_times.append(np.mean(exec_times))
             
             # output the edge probabilities
             global_best_index = np.array(self.generation_best_Y).argmax()
@@ -261,11 +295,11 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
         # plot history
         if self._art_dir_name is not None:
             import matplotlib.pyplot as plt
-            plt.plot(self.generation_best_Y, label='max Fitness', color='b')
-            plt.plot(self.all_history_mean_Y, label='mean Fitness', color='r')
-            plt.fill_between(range(len(self.all_history_mean_Y)),
-                                np.max(self.all_history_Y, axis=1),
-                                np.min(self.all_history_Y, axis=1), color='g', alpha=0.3)
+            plt.plot(self.all_history_leading_FitV, label='max Fitness', color='b')
+            plt.plot(self.all_history_mean_FitV, label='mean Fitness', color='r')
+            plt.fill_between(range(len(self.all_history_mean_FitV)),
+                                self.all_history_mean_FitV + np.std(self.all_history_FitV, axis=1),
+                                self.all_history_mean_FitV - np.std(self.all_history_FitV, axis=1), color='g', alpha=0.3)
             plt.title('Fitness of the population in each generation')
             plt.legend()
             plt.savefig(os.path.join(self._art_dir_name, "fit_history.png"))
@@ -278,11 +312,21 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             plt.plot(np.max(self.all_history_diversity, axis=1), label='max Diversity', color='b')
             plt.plot(self.all_history_mean_diversity, label='mean Diversity', color='r')
             plt.fill_between(range(len(self.all_history_mean_diversity)),
-                                np.max(self.all_history_diversity, axis=1),
-                                np.min(self.all_history_diversity, axis=1), color='g', alpha=0.3)
+                                self.all_history_mean_diversity + np.std(self.all_history_diversity, axis=1),
+                                self.all_history_mean_diversity - np.std(self.all_history_diversity, axis=1), color='g', alpha=0.3)
             plt.title('Diversity of the population in each generation')
             plt.legend()
             plt.savefig(os.path.join(self._art_dir_name, "diversity_history.png"))
+            plt.close()
+            
+            plt.plot(np.max(self.all_history_exec_times, axis=1), label='max Exec Time (s)', color='b')
+            plt.plot(self.all_history_mean_exec_times, label='mean Exec Time (s)', color='r')
+            plt.fill_between(range(len(self.all_history_mean_exec_times)),
+                                self.all_history_mean_exec_times + np.std(self.all_history_exec_times, axis=1),
+                                self.all_history_mean_exec_times - np.std(self.all_history_exec_times, axis=1), color='g', alpha=0.3)
+            plt.title('Execution time (s) of the population in each generation')
+            plt.legend()
+            plt.savefig(os.path.join(self._art_dir_name, "exec_time_history.png"))
             plt.close()
         
         return self.best_x

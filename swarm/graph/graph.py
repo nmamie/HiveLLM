@@ -8,6 +8,7 @@ from copy import deepcopy
 from abc import ABC, abstractmethod
 import async_timeout
 import numpy as np
+import time
 
 from swarm.graph.visualize import GPTSwarmVis
 from swarm.memory import GlobalMemory
@@ -127,6 +128,7 @@ class Graph(ABC):
         in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in useful_node_ids}
         zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
 
+        start_ts = time.time()
         for i, input_node in enumerate(self.input_nodes):
             node_input = deepcopy(inputs)
             input_node.inputs = [node_input]
@@ -137,7 +139,7 @@ class Graph(ABC):
             tries = 0
             while tries < max_tries:
                 try:
-                    await asyncio.wait_for(self.nodes[current_node_id].execute(), timeout=max_time)
+                    await asyncio.wait_for(self.nodes[current_node_id].execute(inference=inference), timeout=max_time)
                     break
                 except asyncio.TimeoutError:
                     print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
@@ -151,6 +153,8 @@ class Graph(ABC):
                     in_degree[successor.id] -= 1
                     if in_degree[successor.id] == 0:
                         zero_in_degree_queue.append(successor.id)
+                        
+        end_ts = time.time() - start_ts
 
         final_answers = []
 
@@ -179,7 +183,7 @@ class Graph(ABC):
             if len(final_answers) == 0:
                 final_answers.append("No answer since there are no inputs provided")
                 intermediate_answers.append("No answer since there are no inputs provided")
-            return final_answers, intermediate_answers
+            return final_answers, intermediate_answers, end_ts
         
         else:
             if len(final_answers) == 0:

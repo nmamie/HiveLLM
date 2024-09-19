@@ -60,6 +60,7 @@ async def main():
     else:
         N = args.num_truthful_agents
         M = N
+        # agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
         # agent_name_list = N * ["SpecialistAgent"] + M * ["AdversarialAgent"]
         agent_name_list = N * ["SpecialistAgent"]
 

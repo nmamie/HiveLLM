@@ -85,7 +85,7 @@ class SpecialistAnswer(Node):
 
         return role, constraint
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference: bool = False, **kwargs):
         
         node_inputs = self.process_input(inputs)
         outputs = []
@@ -117,11 +117,11 @@ Take into account the following opinions which may or may not be true:
 {opinions}"""
 
         _, constraint = await self.node_optimize(input, meta_optmize=False)
-        system_message = f"You are a {self.role}. {constraint}"
+        system_message = f"You are a {self.role} and this should be reflected in your reasoning process. {constraint}"
 
         message = [Message(role="system", content=system_message),
                     Message(role="user", content=user_message)]
-        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
+        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2, inference=inference)
 
         execution = {
             "operation": self.node_name,

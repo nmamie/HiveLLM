@@ -157,7 +157,7 @@ class Evaluator():
                 input_dict = dataset.record_to_swarm_input(record)
                 print(input_dict)
 
-                future_answer = self._swarm.arun(input_dict, realized_graph)
+                future_answer = self._swarm.arun(input_dict, realized_graph, inference=True)
                 future_answers.append(future_answer)
 
             raw_answers = await asyncio.gather(*future_answers)
@@ -278,7 +278,7 @@ class Evaluator():
                     )
 
                 input_dict = dataset.record_to_swarm_input(record)
-                answer = swarm_copy.arun(input_dict, realized_graph)
+                answer = swarm_copy.arun(input_dict, realized_graph, inference=False)
                 future_answers.append(answer)
                 log_probs.append(log_prob)
                 correct_answer = dataset.record_to_target_answer(record)
@@ -289,6 +289,7 @@ class Evaluator():
             # every answer is a tuple of output_answer and intermediate_answers
             raw_output_answers = [answer[0] for answer in answers]
             raw_intermediate_answers = [answer[1] for answer in answers]
+            exec_times = [answer[2] for answer in answers]
                    
             utilities = []
             for raw_output_answer, raw_intermediate_answer, correct_answer in zip(raw_output_answers, raw_intermediate_answers, correct_answers):
@@ -306,7 +307,7 @@ class Evaluator():
                 utilities.append(0.5*output_accuracy.get() + 0.5*intermediate_accuracy.get())
             fitness.append(np.mean(utilities))
                 
-            return np.array(fitness)
+            return np.array(fitness), np.array(exec_times)
                 
         # init GA
         swarm = self._swarm

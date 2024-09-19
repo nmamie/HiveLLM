@@ -95,7 +95,7 @@ class FinalDecision(Node):
         return pipeline
 
     async def _execute(self, inputs: List[Any] = [], 
-                       **kwargs) -> None:
+                       inference: bool = False, **kwargs) -> None:
 
         node_inputs = self.process_input(inputs)
         prompt = None
@@ -107,7 +107,7 @@ class FinalDecision(Node):
             message = [Message(role="system", content=f"You are a {role}. {constraint}"),
                     Message(role="user", content=prompt)]
         
-            response = await self.llm.agen(message)
+            response = await self.llm.agen(message, inference=inference)
 
         elif self.strategy == MergingStrategy.MajorityVote:
             if len(inputs) == 0:
@@ -138,7 +138,7 @@ class FinalDecision(Node):
             prompt = self.prompt_set.get_self_consistency(question=question, answers=answers, constraint=constraint)
             message = [Message(role="system", content=f"You are a {self.role}. {self.constraint}"),
                     Message(role="user", content=prompt)]
-            response = await self.llm.agen(message)
+            response = await self.llm.agen(message, inference=inference)
             print(f"{answers=} {response=}")
 
         elif self.strategy == MergingStrategy.SelectBest:  
@@ -152,7 +152,7 @@ class FinalDecision(Node):
             prompt = self.prompt_set.get_select_best(question=question, answers=answers, constraint=constraint)
             message = [Message(role="system", content=f"You are a {self.role}. {self.constraint}"),
                     Message(role="user", content=prompt)]
-            response = await self.llm.agen(message)
+            response = await self.llm.agen(message, inference=inference)
             print(f"{answers=} {response=}")
 
 

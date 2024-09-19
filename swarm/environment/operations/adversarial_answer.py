@@ -70,7 +70,7 @@ class AdversarialAnswer(Node):
         return pipeline
 
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference: bool = False, **kwargs):
         
         node_inputs = self.process_input(inputs)
         inputs = []
@@ -78,7 +78,7 @@ class AdversarialAnswer(Node):
             role, constraint, prompt= self.meta_prompt(input, meta_init=False)
             message = [Message(role="system", content=f"You are {role}. {constraint}"),
                     Message(role="user", content=prompt)]
-            response = await self.llm.agen(message, temperature=0.2)
+            response = await self.llm.agen(message, temperature=0.2, inference=inference)
             # response = "I am an adversarial agent."
             
             _memory = {

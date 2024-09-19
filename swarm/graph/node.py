@@ -106,7 +106,7 @@ class Node(ABC):
 
         return inputs
 
-    async def execute(self, **kwargs):
+    async def execute(self, inference, **kwargs):
 
         self.outputs = []
         tasks = []
@@ -117,15 +117,15 @@ class Node(ABC):
                     predecessor_outputs = predecessor.outputs
                     if predecessor_outputs is not None and isinstance(predecessor_outputs, list):
                         combined_inputs.extend(predecessor_outputs)
-                tasks.append(asyncio.create_task(self._execute(combined_inputs, **kwargs)))
+                tasks.append(asyncio.create_task(self._execute(combined_inputs, inference, **kwargs)))
             else:
                 for predecessor in self.predecessors:
                     predecessor_outputs = predecessor.outputs
                     if isinstance(predecessor_outputs, list) and predecessor_outputs:
                         for predecessor_output in predecessor_outputs:
-                            tasks.append(asyncio.create_task(self._execute(predecessor_output, **kwargs)))
+                            tasks.append(asyncio.create_task(self._execute(predecessor_output, inference, **kwargs)))
         elif self.inputs:
-            tasks = [asyncio.create_task(self._execute(input, **kwargs)) for input in self.inputs]
+            tasks = [asyncio.create_task(self._execute(input, inference, **kwargs)) for input in self.inputs]
         else:
             warnings.warn("No input received.")
             return
@@ -141,7 +141,7 @@ class Node(ABC):
                     logger.error(f"Node {type(self).__name__} failed to execute due to: {result.__class__.__name__}: {result}")
 
     @abstractmethod
-    async def _execute(self, input, **kwargs):
+    async def _execute(self, input, inference, **kwargs):
         """ To be overriden by the descendant class """
 
     def log(self):

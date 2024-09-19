@@ -8,6 +8,7 @@ class LLM(ABC):
     DEFAULT_MAX_TOKENS = 1000
     DEFAULT_TEMPERATURE = 0.2
     DEFUALT_NUM_COMPLETIONS = 1
+    DEFAULT_INFERENCE = False
 
     @abstractmethod
     async def agen(
@@ -15,6 +16,7 @@ class LLM(ABC):
         messages: List[Message],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        inference: Optional[bool] = False,
         num_comps: Optional[int] = None,
         ) -> Union[List[str], str]:
 
