@@ -116,8 +116,8 @@ class EdgeWiseDistribution(ConnectDistribution):
                 else:
                     log_probs.append(torch.log(1 - edge_prob))
 
-        # log_prob = torch.sum(torch.stack(log_probs))
-        return _graph, log_probs
+        log_prob = torch.sum(torch.stack(log_probs))
+        return _graph, log_prob
 
     def realize_full(self, graph: CompositeGraph) -> CompositeGraph:
         _graph = deepcopy(graph)

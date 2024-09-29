@@ -27,7 +27,7 @@ class BranchingStep(CrosswordsOperation):
         self.branch_factor = branch_factor
         self.prune = prune
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs):
         llm_querier = self.llm_query_with_cache
         env = inputs["env"]
         if not env.extendable:

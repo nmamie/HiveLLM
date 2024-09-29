@@ -36,6 +36,6 @@ def optimize(swarm, evaluator, num_iter=100, lr=1e-1, display_freq=10, batch_siz
             edge_probs = torch.nn.Sigmoid()(swarm.connection_dist.edge_logits)
             print(f'edge probabilities = {edge_probs}')
             if record:
-                with open(f"/data-nfs/mamien/GPTSwarm/result/crosswords/{experiment_id}_utilities_{step}.pkl", "wb") as file:
+                with open(f"/data-nfs/mamien/HiveLLM/result/crosswords/{experiment_id}_utilities_{step}.pkl", "wb") as file:
                     pickle.dump(utilities, file)
-                torch.save(swarm.connection_dist.state_dict(), f"/data-nfs/mamien/GPTSwarm/result/crosswords/{experiment_id}_edge_logits_{step}.pt")
+                torch.save(swarm.connection_dist.state_dict(), f"/data-nfs/mamien/HiveLLM/result/crosswords/{experiment_id}_edge_logits_{step}.pt")

@@ -41,7 +41,7 @@ class BruteForceStep(CrosswordsOperation):
         except:
             return best_score, best_env
         
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs):
         llm_querier = self.llm_query_with_cache
         env = deepcopy(inputs["env"])
         prompt = self.prompt_set.get_propose_prompt(env.render())

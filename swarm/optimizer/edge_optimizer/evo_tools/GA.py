@@ -407,7 +407,7 @@ class GA(GeneticAlgorithmBase):
 
         self.len_chrom = sum(self.Lind)
         
-        self.device = "cuda:7" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda:3" if torch.cuda.is_available() else "cpu"
         
         self.crtbp()
 

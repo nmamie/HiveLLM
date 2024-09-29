@@ -22,7 +22,7 @@ class GreedySteps(CrosswordsOperation):
         self.llm = LLMRegistry.get(model_name)
         self.prompt_set = PromptSetRegistry.get(domain)
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs):
         llm_querier = self.llm_query_with_cache
         env = inputs["env"]
         prompt = self.prompt_set.get_propose_prompt(env.render())

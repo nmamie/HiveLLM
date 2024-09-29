@@ -108,23 +108,28 @@ curr_inf = False
 def load_model(inference: bool = False):
     if inference is True:
         model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
-    else: model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    # else: model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    else: model_id = "meta-llama/Llama-3.2-3B-Instruct"
 
-    hf_pipeline = transformers.pipeline(
-            "text-generation",
-            model=model_id,
-            model_kwargs={
-                "torch_dtype": torch.bfloat16,
-                        },
-            # trust_remote_code=True,
-            device_map="auto",
-        )
+    model_dict = {}
 
-    accelerator = Accelerator()
-    model = accelerator.prepare(hf_pipeline)
+    for i in range(10):
+        hf_pipeline = transformers.pipeline(
+                "text-generation",
+                model=model_id,
+                model_kwargs={
+                    "torch_dtype": torch.bfloat16,
+                            },
+                # trust_remote_code=True,
+                device_map="auto",
+            )
+
+        accelerator = Accelerator()
+        model = accelerator.prepare(hf_pipeline)
+        model_dict[i] = deepcopy(model)
 
     print('Model loaded')
-    return model
+    return model_dict
 
 # import pdb; pdb.set_trace()
 
@@ -149,11 +154,13 @@ def hugging_chat(
     
     if temperature > 0.0:
         do_sample = True
-        top_p = 0.9
+        top_p = 1
+        repetition_penalty = 1.12
     else:
-        top_p = None
         do_sample = False
-        temperature = 0.0
+        top_p = None
+        temperature = None
+        repetition_penalty = None
                         
     assert model is not None, "Model not loaded"
     
@@ -198,15 +205,18 @@ async def hugging_achat(
     # ).to(device)
     
     if model is None or curr_inf != inference:
-        model = load_model(inference=inference)
+        model_dict = load_model(inference=inference)
+        model = random.choice(list(model_dict.values()))
         curr_inf = inference
     
     if temperature > 0.0:
         do_sample = True
+        top_p = 1
         repetition_penalty = 1.12
     else:
         do_sample = False
-        temperature = 0.0
+        top_p = None
+        temperature = None
         repetition_penalty = None
             
     assert model is not None, "Model not loaded"
@@ -219,6 +229,7 @@ async def hugging_achat(
                 pad_token_id = model.tokenizer.eos_token_id,
                 do_sample=do_sample,
                 temperature=temperature,
+                top_p=top_p,
                 # repetition_penalty=repetition_penalty,
                 # batch_size=4, 
             )

@@ -25,5 +25,5 @@ class ReturnAll(CrosswordsOperation):
         self.prompt_set = PromptSetRegistry.get(domain)
         self.best_state = best_state
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs):
         return inputs

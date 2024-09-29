@@ -183,7 +183,8 @@ class Graph(ABC):
             if len(final_answers) == 0:
                 final_answers.append("No answer since there are no inputs provided")
                 intermediate_answers.append("No answer since there are no inputs provided")
-            return final_answers, intermediate_answers, end_ts
+            # return final_answers, intermediate_answers, end_ts
+            return final_answers
         
         else:
             if len(final_answers) == 0:

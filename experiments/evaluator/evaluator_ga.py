@@ -53,7 +53,7 @@ class Evaluator():
         else:
             self._logger = None
             
-        self.device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     async def evaluate_direct_answer(self,
             limit_questions: Optional[int] = None,
@@ -76,9 +76,10 @@ class Evaluator():
             input_dict = dataset.record_to_swarm_input(record)
             print(input_dict)
 
-            raw_answer = await io_agent.run(input_dict)
+            raw_answer = await io_agent.run(input_dict, inference=True)
 
             print("Raw answer:", raw_answer)
+            raw_answer = raw_answer[0]
             answer = dataset.postprocess_answer(raw_answer)
             print("Postprocessed answer:", answer)
             correct_answer = dataset.record_to_target_answer(record)
@@ -157,7 +158,8 @@ class Evaluator():
                 input_dict = dataset.record_to_swarm_input(record)
                 print(input_dict)
 
-                future_answer = self._swarm.arun(input_dict, realized_graph, inference=True)
+                # future_answer = self._swarm.arun(input_dict, realized_graph, inference=True)
+                future_answer = self._swarm.arun(input_dict, realized_graph, inference=False)
                 future_answers.append(future_answer)
 
             raw_answers = await asyncio.gather(*future_answers)

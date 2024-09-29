@@ -26,7 +26,7 @@ class Reflection(CrosswordsOperation):
         self.branch_factor = branch_factor
         self.prune = prune
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs) -> List[Dict[str, MiniCrosswordsEnv]]:
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs) -> List[Dict[str, MiniCrosswordsEnv]]:
         llm_querier = self.llm_query_with_cache
         env = deepcopy(inputs["env"])
         await env.evaluate(llm_querier, self.prompt_set.get_if_correct_prompt, self.prompt_set.get_value_prompt)
