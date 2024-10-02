@@ -168,28 +168,32 @@ class Graph(ABC):
                     final_answer = output_message.get("output", output_message)
                     final_answers.append(final_answer)
         
-        if not inference:
-            intermediate_answers = []
-            for input_node in self.input_nodes:
-                input_messages = input_node.outputs
-                if len(input_messages) > 0 and not return_all_outputs:
-                    intermediate_answer = input_messages[-1].get("output", input_messages[-1])
-                    intermediate_answers.append(intermediate_answer)
-                else:
-                    for input_message in input_messages:
-                        intermediate_answer = input_message.get("output", input_message)
-                        intermediate_answers.append(intermediate_answer)
+        # if not inference:
+        #     intermediate_answers = []
+        #     for input_node in self.input_nodes:
+        #         input_messages = input_node.outputs
+        #         if len(input_messages) > 0 and not return_all_outputs:
+        #             intermediate_answer = input_messages[-1].get("output", input_messages[-1])
+        #             intermediate_answers.append(intermediate_answer)
+        #         else:
+        #             for input_message in input_messages:
+        #                 intermediate_answer = input_message.get("output", input_message)
+        #                 intermediate_answers.append(intermediate_answer)
 
-            if len(final_answers) == 0:
-                final_answers.append("No answer since there are no inputs provided")
-                intermediate_answers.append("No answer since there are no inputs provided")
-            # return final_answers, intermediate_answers, end_ts
-            return final_answers
+        #     if len(final_answers) == 0:
+        #         final_answers.append("No answer since there are no inputs provided")
+        #         intermediate_answers.append("No answer since there are no inputs provided")
+        #     # return final_answers, intermediate_answers, end_ts
+        #     return final_answers
         
-        else:
-            if len(final_answers) == 0:
-                final_answers.append("No answer since there are no inputs provided")
-            return final_answers
+        # else:
+        #     if len(final_answers) == 0:
+        #         final_answers.append("No answer since there are no inputs provided")
+        #     return final_answers
+        
+        if len(final_answers) == 0:
+            final_answers.append("No answer since there are no inputs provided")
+        return final_answers
             
 
     def find_node(self, id: str):

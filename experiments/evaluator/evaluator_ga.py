@@ -152,7 +152,7 @@ class Evaluator():
             future_answers = []
             for record in record_batch:
                 if mode == 'randomly_connected_swarm':
-                    realized_graph, _ = self._swarm.connection_dist.realize(self._swarm.composite_graph)
+                    realized_graph, _ = self._swarm.connection_dist.realize_particle(self._swarm.composite_graph)
                 assert realized_graph is not None
 
                 input_dict = dataset.record_to_swarm_input(record)
@@ -274,7 +274,7 @@ class Evaluator():
             correct_answers = []
             for i_record, record in zip(range(batch_size), loader):
 
-                realized_graph, log_prob = swarm_copy.connection_dist.realize(
+                realized_graph, log_prob = swarm_copy.connection_dist.realize_particle(
                     swarm_copy.composite_graph,
                     # temperature=3.0, # DEBUG
                     )
