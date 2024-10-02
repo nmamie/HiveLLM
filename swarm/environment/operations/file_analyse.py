@@ -35,7 +35,7 @@ class FileAnalyse(Node):
     def node_name(self):
         return self.__class__.__name__
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs):
 
         node_inputs = self.process_input(inputs)
         outputs = []

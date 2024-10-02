@@ -7,21 +7,22 @@ from typing import List, Any, Optional
 
 from swarm.llm.format import Message
 from swarm.graph import Node
-from swarm.environment import GoogleSearchEngine, SearchAPIEngine
+from swarm.environment import GoogleSearchEngine, SearchAPIEngine, SearchEngine
 from swarm.utils.log import logger, swarmlog
 from swarm.utils.globals import Cost
 from swarm.environment.prompt.prompt_set_registry import PromptSetRegistry
 from swarm.llm import LLMRegistry
 
 #searcher = GoogleSearchEngine()
-searcher = SearchAPIEngine()
+# searcher = SearchAPIEngine()
+searcher = SearchEngine()
 
 
 class WebSearch(Node):
     def __init__(self, 
                  domain: str,
                  model_name: Optional[str] = None,
-                 operation_description: str = "Given a question, search the web for infomation.",
+                 operation_description: str = "Given a question, search the web for information.",
                  id=None):
         super().__init__(operation_description, id, True)
         self.domain = domain
@@ -34,7 +35,7 @@ class WebSearch(Node):
     def node_name(self):
         return self.__class__.__name__
 
-    async def _execute(self, inputs: List[Any] = [], max_keywords: int = 5, **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, max_keywords: int = 5, **kwargs):
 
         node_inputs = self.process_input(inputs)
         outputs = []
@@ -42,32 +43,38 @@ class WebSearch(Node):
 
             task = input["task"]
             query = input['output']
-            prompt = self.prompt_set.get_websearch_prompt(question=task, query=query)
+            # prompt = self.prompt_set.get_websearch_prompt(question=task, query=query)
 
-            message = [Message(role="system", content=f"You are a {self.role}."),
-                       Message(role="user", content=prompt)]
-            generated_quires = await self.llm.agen(message)
-
-
-            generated_quires = generated_quires.split(',')[:max_keywords]
-            logger.info(f"The search keywords include: {generated_quires}")
-            search_results = [self.web_search(query) for query in generated_quires]
+            # message = [Message(role="system", content=f"You are a {self.role}."),
+            #            Message(role="user", content=prompt)]
+            # generated_quires = await self.llm.agen(message)
 
 
-            logger.info(f"The search results: {search_results}")
-
-
-
-            distill_prompt = self.prompt_set.get_distill_websearch_prompt(
-               question=input["task"], query=query, results='.\n'.join(search_results))
+            # generated_quires = generated_quires.split(',')[:max_keywords]
+            # logger.info(f"The search keywords include: {generated_quires}")
             
-            response = await self.llm.agen(distill_prompt)
+            prompt = task + " " + query
+            logger.info(f"The web search prompt: {prompt}")
+            
+            # search_results = [self.web_search(query) for query in generated_quires]
+            search_results = self.web_search(prompt)
+
+
+            logger.info(f"The search result: {search_results}")
+
+
+
+            # distill_prompt = self.prompt_set.get_distill_websearch_prompt(
+            #    question=input["task"], query=query, results='.\n'.join(search_results))
+            
+            # response = await self.llm.agen(distill_prompt)
+            response = search_results
 
             executions =  {"operation": self.node_name,
                             "task": task, 
                             "files": input.get("files", []),
-                            "input": query, 
-                            "subtask": distill_prompt,
+                            "input": query,
+                            # "subtask": distill_prompt,
                             "output": response,
                             "format": "natural language"}
 

@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from googleapiclient.discovery import build
 import requests
 import ast
-load_dotenv()
+from duckduckgo_search import DDGS
+# load_dotenv()
 
 
 class GoogleSearchEngine():
@@ -46,6 +47,23 @@ class SearchAPIEngine():
                 
                 return '\n'.join([res['snippet'] for res in response['organic_results'][:item_num]])
             return ''
+        
+class SearchEngine():
+    def search(self, keywords: str, model: str = "gpt-4o-mini", timeout: int = 30) -> str:
+        """Initiates a chat session with DuckDuckGo AI.
+
+        Args:
+            keywords (str): The initial message or question to send to the AI.
+            model (str): The model to use: "gpt-4o-mini", "claude-3-haiku", "llama-3.1-70b", "mixtral-8x7b".
+                Defaults to "gpt-4o-mini".
+            timeout (int): Timeout value for the HTTP client. Defaults to 30.
+
+        Returns:
+            str: The response from the AI.
+        """
+        ddgs = DDGS()
+        response = ddgs.chat(keywords, model, timeout)
+        return response
 
 
 
@@ -53,4 +71,5 @@ if __name__ == "__main__":
     # search_engine = GoogleSearchEngine()
     # print(search_engine.search("cell phone tower"))
 
-    print(SearchAPIEngine().search("Juergen Schmidhuber"))
+    # print(SearchAPIEngine().search("Juergen Schmidhuber"))
+    print(SearchEngine().search("Marvin Minsky"))

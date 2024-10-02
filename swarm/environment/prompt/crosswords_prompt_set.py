@@ -16,7 +16,8 @@ class CrosswordsPromptSet(PromptSet):
 
 {board}
 
-Given the current status, list all possible answers for unfilled or changed words, and your confidence levels (certain/high/medium/low), using the format "h1. apple (medium)". Use "certain" cautiously and only when you are 100% sure this is the correct word. You can list more then one possible answer for each word.
+Given the current status, list the most confident answers for unfilled or changed words, and your confidence levels (certain/high/medium/low), using the format "h1. apple (medium)". Use "certain" cautiously and only when you are 100% sure this is the correct word. You can list more then one possible answer for each word.
+Use as few words as possible, at most {num_candidates} words per word and no further explanation is needed. Keep it to the bare minimum.
 '''
     @staticmethod
     def get_if_correct_prompt(word, meaning):
@@ -49,7 +50,7 @@ Do not include the phrase "next time" in your response.
     
     @staticmethod
     def get_value_prompt(input):
-        return f'''Evaluate if there exists a five letter word of some meaning that fit some letter constraints (sure/maybe/impossible).
+        return f'''Evaluate if there exists a five letter word of some meaning that fit some letter constraints (sure/maybe/impossible), use as few words and lines as possible.
 
 Incorrect; to injure: w _ o _ g
 The letter constraint is: 5 letters, letter 1 is w, letter 3 is o, letter 5 is g.
@@ -101,7 +102,7 @@ impossible
     
     @staticmethod
     def get_role():
-        return "a knowledgeable expert in question answering in a swarm full of truthful and adversarial experts with whom you should collaborate to answer 5x5 mini crosswords"
+        return "a knowledgeable expert in question answering specialized on solving 5x5 mini crosswords"
     
     @staticmethod
     def get_constraint():
@@ -415,7 +416,7 @@ propose_one_prompt = '''Let's play a 5 x 5 mini crossword, where each word shoul
 {input}
 
 Given the current status, respond only one of your most confident answers for a unfilled or changed word, using the format "h5. write" or "v3. apple".
-If there is no confident answer, respond "I cannot think of any words."
+If there is no confident answer, respond "I cannot think of any words. Use as few words and lines as possible."
 '''
 
 

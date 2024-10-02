@@ -111,25 +111,21 @@ def load_model(inference: bool = False):
     # else: model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     else: model_id = "meta-llama/Llama-3.2-3B-Instruct"
 
-    model_dict = {}
+    hf_pipeline = transformers.pipeline(
+            "text-generation",
+            model=model_id,
+            model_kwargs={
+                "torch_dtype": torch.bfloat16,
+                        },
+            # trust_remote_code=True,
+            device_map="auto",
+        )
 
-    for i in range(10):
-        hf_pipeline = transformers.pipeline(
-                "text-generation",
-                model=model_id,
-                model_kwargs={
-                    "torch_dtype": torch.bfloat16,
-                            },
-                # trust_remote_code=True,
-                device_map="auto",
-            )
-
-        accelerator = Accelerator()
-        model = accelerator.prepare(hf_pipeline)
-        model_dict[i] = deepcopy(model)
+    accelerator = Accelerator()
+    model = accelerator.prepare(hf_pipeline)
 
     print('Model loaded')
-    return model_dict
+    return model
 
 # import pdb; pdb.set_trace()
 
@@ -138,7 +134,7 @@ def load_model(inference: bool = False):
 def hugging_chat(
     model_name,
     messages: List[str],
-    max_tokens: int = 50,
+    max_tokens: int = 30,
     temperature: float = 0.0,
     num_comps=1,
     return_cost=False,
@@ -178,16 +174,20 @@ def hugging_chat(
         print(f"Error: {e}")
         raise e
     
-    answer = response[0]["generated_text"][-1]['content']
-    
-    return answer
+    if num_comps == 1:
+        cost_count(response, model_name)
+        return response[0]["generated_text"][-1]['content']
+
+    cost_count(response, model_name)
+
+    return [resp["generated_text"][-1]['content'] for resp in response]
         
 
 @retry(wait=wait_random_exponential(max=100), stop=stop_after_attempt(10))
 async def hugging_achat(
     model_name,
     messages: List[str],
-    max_tokens: int = 50,
+    max_tokens: int = 30,
     temperature: float = 0.0,
     inference: bool = False,
     num_comps=1,
@@ -199,14 +199,15 @@ async def hugging_achat(
         return ''
     
     formatted_messages = [asdict(message) for message in messages]
+    
+    len_messages = sum([len(message["content"]) for message in formatted_messages])
         
     # input_ids = tokenizer.apply_chat_template(
     #     formatted_messages, add_generation_prompt=True, return_tensors="pt"
     # ).to(device)
     
     if model is None or curr_inf != inference:
-        model_dict = load_model(inference=inference)
-        model = random.choice(list(model_dict.values()))
+        model = load_model(inference=inference)
         curr_inf = inference
     
     if temperature > 0.0:
@@ -222,7 +223,7 @@ async def hugging_achat(
     assert model is not None, "Model not loaded"
 
     try:
-        with async_timeout.timeout(60):
+        with async_timeout.timeout(20):
             response = model(
                 formatted_messages,
                 max_new_tokens=max_tokens,
@@ -242,9 +243,16 @@ async def hugging_achat(
         raise e
     
     answer = response[0]["generated_text"][-1]['content']
-    # answer = tokenizer.decode(output[0], skip_special_tokens=True)
-    
-    return answer
+    model_name = "inference" #TODO
+        
+    if num_comps == 1:
+        # cost_count(response, model_name, float(len_messages), float(len(answer))) #TODO
+        print(f"Answer: {answer}")
+        return response[0]["generated_text"][-1]['content']
+
+    cost_count(response, model_name, len_messages, len(answer))
+
+    return [resp["generated_text"][-1]['content'] for resp in response]
 
 @LLMRegistry.register('HuggingChat')
 class HuggingChat(LLM):

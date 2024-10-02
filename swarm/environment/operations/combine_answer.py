@@ -57,7 +57,7 @@ class CombineAnswer(Node):
         return self.role, self.constraint, prompt
 
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], inference=False, **kwargs):
 
         node_inputs = self.process_input(inputs)
 

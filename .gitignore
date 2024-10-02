@@ -184,10 +184,13 @@ example.html
 dataset/crosswords
 dataset/humaneval
 dataset/demos
-dataset/gaia/test_files/
-dataset/gaia/val_files
+dataset/gaia/gaia/test_files/
+dataset/gaia/gaia/val_files/
 dataset/gaia/*.json
 dataset/gaia/utils/*.jsonl
+dataset/gaia/gaia/*.json
+dataset/gaia/gaia/utils/*.jsonl
+dataset/gaia/__MACOSX/
 
 /runs/
 

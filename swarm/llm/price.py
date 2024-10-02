@@ -8,12 +8,12 @@ from swarm.utils.globals import Cost, PromptTokens, CompletionTokens
 # GPT3.5: https://platform.openai.com/docs/models/gpt-3-5
 # DALL-E: https://openai.com/pricing
 
-def cost_count(response, model_name):
+def cost_count(response, model_name, len_messages, len_responses):
     branch: str
     prompt_len: int
     completion_len: int
     price: float
-
+    
     if "gpt-4" in model_name:
         try:
             branch = "gpt-4"
@@ -41,12 +41,15 @@ def cost_count(response, model_name):
     else:
         branch = "other"
         price = 0.0
-        prompt_len = response.usage.prompt_tokens
-        completion_len = response.usage.completion_tokens
-
+        # prompt_len = response.usage.prompt_tokens
+        # completion_len = response.usage.completion_tokens
+    
     Cost.instance().value += price
-    PromptTokens.instance().value += prompt_len
-    CompletionTokens.instance().value += completion_len
+    PromptTokens.instance().value += len_messages
+    CompletionTokens.instance().value += len_responses
+    
+    print(f"Model: {model_name}, Branch: {branch}, Price: {price}, Prompt Tokens: {PromptTokens.instance().value}, Completion Tokens: {CompletionTokens.instance().value}")
+
 
     # print(f"Prompt Tokens: {prompt_len}, Completion Tokens: {completion_len}")
     return price, prompt_len, completion_len

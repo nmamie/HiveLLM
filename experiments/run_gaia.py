@@ -13,6 +13,7 @@ from pathlib import Path
 from swarm.graph.swarm import Swarm
 from swarm.environment.tools.reader.readers import JSONReader, YAMLReader
 from swarm.environment.agents.io import IO
+from swarm.environment.agents.specialist_agent import SpecialistAgent
 from swarm.environment.agents.gaia.normal_io import NormalIO
 from swarm.environment.agents.gaia.tool_io import ToolIO
 from swarm.environment.agents.gaia.web_io import WebIO
@@ -35,14 +36,14 @@ def load_config(config_path):
         return yaml.safe_load(file)
 
 async def main():
-    parser = argparse.ArgumentParser(description="GPTSwarm Experiments on GAIA")
+    parser = argparse.ArgumentParser(description="HiveLLM Experiments on GAIA")
     parser.add_argument("--config", type=str, help="Path to configuration YAML file.")
     parser.add_argument("--domain", type=str, default="gaia")
     parser.add_argument("--agents", nargs='+', default=["IO"])
-    parser.add_argument("--dataset_json", type=str, default="datasets/gaia/level_1_val.json") #level_1_val_solveable.json
-    parser.add_argument("--dataset_files", type=str, default="datasets/gaia/val_files")
+    parser.add_argument("--dataset_json", type=str, default="dataset/gaia/gaia/level_1_val.json") #level_1_val_solveable.json
+    parser.add_argument("--dataset_files", type=str, default="dataset/gaia/gaia/val_files")
     parser.add_argument("--result_file", type=str, default=None)
-    parser.add_argument("--llm", type=str, default="gpt-4-1106-preview") #gpt-4-1106-preview  gpt-3.5-turbo-1106 gpt-3.5-turbo gpt-4
+    parser.add_argument("--llm", type=str, default="inference") #gpt-4-1106-preview  gpt-3.5-turbo-1106 gpt-3.5-turbo gpt-4
     args = parser.parse_args()
 
     result_path = GPTSWARM_ROOT / "result"
@@ -66,28 +67,31 @@ async def main():
 
     ####################################
 
-    # strategy = MergingStrategy.SelfConsistency #MergingStrategy.SelectBest #MergingStrategy.SelfConsistency #MergingStrategy.SelectBest #MergingStrategy.SelectBest #MergingStrategy.SelfConsistency # MergingStrategy.MajorityVote MergingStrategy.RandomChoice
+    strategy = MergingStrategy.SelfConsistency #MergingStrategy.SelectBest #MergingStrategy.SelfConsistency #MergingStrategy.SelectBest #MergingStrategy.SelectBest #MergingStrategy.SelfConsistency # MergingStrategy.MajorityVote MergingStrategy.RandomChoice
 
     experiment_name = "ToolTOT"
 
-    # swarm = Swarm(["ToolTOT"]*7, 
+    # swarm = Swarm(["ToolTOT"]*3, 
     #               "gaia",
-    #               model_name="mock", #args.llm, #"mock", #args.llm,#args.llm,
+    #               model_name=args.llm, #args.llm, #"mock", #args.llm,#args.llm,
     #               final_node_class="FinalDecision",
     #               final_node_kwargs=dict(strategy=strategy)
     #             )
     # swarm.composite_graph.display()
 
     print(args.llm)
+    
+    # print("swarm loaded...")
 
-    #agent = IO(domain="gaia", model_name=args.llm)
+    # agent = IO(domain="gaia", model_name=args.llm)
     #agent = WebIO(domain="gaia", model_name=args.llm)
     #agent = ToolIO(domain="gaia", model_name=args.llm)
     agent = ToolTOT(domain="gaia", model_name=args.llm)
 
-    #io = DirectAnswer(domain="gaia", model_name=args.llm)
+    # io = DirectAnswer(domain="gaia", model_name=args.llm)
 
     agent.display()
+    print("agent loaded...")
 
     ####################################
 
@@ -103,9 +107,9 @@ async def main():
         ground_truth = item["Final answer"]
         inputs = {"task": task, "files": files, "GT": ground_truth}
 
-        swarmlog("🐝GPTSWARM SYS", f"Finish {i} samples...", Cost.instance().value, PromptTokens.instance().value, CompletionTokens.instance().value, log_file_path)
+        swarmlog("🐝HIVELLM SYS", f"Finish {i} samples...", Cost.instance().value, PromptTokens.instance().value, CompletionTokens.instance().value, log_file_path)
 
-        # Swarm
+        # # Swarm
         # answer = await swarm.composite_graph.run(inputs)
         # answer = answer[-1].split("FINAL ANSWER: ")[-1]
 
@@ -137,8 +141,8 @@ async def main():
         print("-----")
         """
 
-        # current_time = Time.instance().value or time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
-        # Time.instance().value = current_time
+        current_time = Time.instance().value or time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+        Time.instance().value = current_time
         
         result_dir = Path(f"{GPTSWARM_ROOT}/result/eval")
         result_file = result_file or (result_dir / f"{'_'.join(experiment_name.split())}_{args.llm}_{current_time}.json")

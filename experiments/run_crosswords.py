@@ -60,18 +60,18 @@ if __name__ == "__main__":
     
     
     init_connection_probability = .1
-    batch_size = 4
+    batch_size = 1
     use_learned_order = False
     include_inner_agent_connections = True
     connect_output_nodes_to_final_node = True
     window_size = 10
     evaluator = CrosswordsEvaluator(test_data, batch_size=batch_size, metric="words", window_size=window_size, init_score=0.4, use_init_score=True)
-    swarm = Swarm(["CrosswordsReflection", "CrosswordsToT", "CrosswordsBruteForceOpt"], "crosswords", "inference", #"gpt-4-1106-preview"
+    swarm = Swarm(["CrosswordsToT"], "crosswords", "inference", #"gpt-4-1106-preview"
                 final_node_class="ReturnAll", 
                 final_node_kwargs={},
                 edge_optimize=True,
                 init_connection_probability=init_connection_probability, 
                 connect_output_nodes_to_final_node=connect_output_nodes_to_final_node, 
                 include_inner_agent_connections=include_inner_agent_connections)
-    optimize(swarm, evaluator, batch_size=batch_size, num_iter=20, display_freq=1, record=True,
+    optimize(swarm, evaluator, batch_size=batch_size, num_iter=11, display_freq=1, record=True,
               experiment_id=experiment_id, lr=.4, use_learned_order=use_learned_order)
