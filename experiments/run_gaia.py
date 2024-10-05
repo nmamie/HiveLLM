@@ -71,27 +71,27 @@ async def main():
 
     experiment_name = "ToolTOT"
 
-    # swarm = Swarm(["ToolTOT"]*3, 
-    #               "gaia",
-    #               model_name=args.llm, #args.llm, #"mock", #args.llm,#args.llm,
-    #               final_node_class="FinalDecision",
-    #               final_node_kwargs=dict(strategy=strategy)
-    #             )
-    # swarm.composite_graph.display()
+    swarm = Swarm(["ToolTOT"]*3, 
+                  "gaia",
+                  model_name=args.llm, #args.llm, #"mock", #args.llm,#args.llm,
+                  final_node_class="FinalDecision",
+                  final_node_kwargs=dict(strategy=strategy)
+                )
+    swarm.composite_graph.display()
 
     print(args.llm)
     
-    # print("swarm loaded...")
+    print("swarm loaded...")
 
     # agent = IO(domain="gaia", model_name=args.llm)
     #agent = WebIO(domain="gaia", model_name=args.llm)
     #agent = ToolIO(domain="gaia", model_name=args.llm)
-    agent = ToolTOT(domain="gaia", model_name=args.llm)
+    # agent = ToolTOT(domain="gaia", model_name=args.llm)
 
     # io = DirectAnswer(domain="gaia", model_name=args.llm)
 
-    agent.display()
-    print("agent loaded...")
+    # agent.display()
+    # print("agent loaded...")
 
     ####################################
 
@@ -109,28 +109,28 @@ async def main():
 
         swarmlog("🐝HIVELLM SYS", f"Finish {i} samples...", Cost.instance().value, PromptTokens.instance().value, CompletionTokens.instance().value, log_file_path)
 
-        # # Swarm
-        # answer = await swarm.composite_graph.run(inputs)
-        # answer = answer[-1].split("FINAL ANSWER: ")[-1]
-
-        # end_time = time.time()
-        # exe_time =  end_time - start_time
-
-        # print("-----")
-        # print(f"SWARM ANSWER: {answer}")
-        # print("-----")
-
-        # Agent
-        answer = await agent.run(inputs=inputs)
+        # Swarm
+        answer = await swarm.composite_graph.run(inputs)
         answer = answer[-1].split("FINAL ANSWER: ")[-1]
 
         end_time = time.time()
         exe_time =  end_time - start_time
 
+        print("-----")
+        print(f"SWARM ANSWER: {answer}")
+        print("-----")
 
-        print("-----")
-        print(f"AGENT ANSWER: {answer}")
-        print("-----")
+        # # Agent
+        # answer = await agent.run(inputs=inputs)
+        # answer = answer[-1].split("FINAL ANSWER: ")[-1]
+
+        # end_time = time.time()
+        # exe_time =  end_time - start_time
+
+
+        # print("-----")
+        # print(f"AGENT ANSWER: {answer}")
+        # print("-----")
         
         """
         answer = await io._execute(inputs=inputs)

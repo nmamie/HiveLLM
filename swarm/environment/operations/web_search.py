@@ -43,40 +43,41 @@ class WebSearch(Node):
 
             task = input["task"]
             query = input['output']
-            # prompt = self.prompt_set.get_websearch_prompt(question=task, query=query)
+            prompt = self.prompt_set.get_websearch_prompt(question=task, query=query)
 
-            # message = [Message(role="system", content=f"You are a {self.role}."),
-            #            Message(role="user", content=prompt)]
-            # generated_quires = await self.llm.agen(message)
+            message = [Message(role="system", content=f"You are a {self.role}."),
+                       Message(role="user", content=prompt)]
+            generated_quires = await self.llm.agen(message)
 
 
-            # generated_quires = generated_quires.split(',')[:max_keywords]
-            # logger.info(f"The search keywords include: {generated_quires}")
+            generated_quires = generated_quires.split(',')[:max_keywords]
+            logger.info(f"The search keywords include: {generated_quires}")
             
-            prompt = task + " " + query
-            logger.info(f"The web search prompt: {prompt}")
+            # prompt = task + " " + query
+            # logger.info(f"The web search prompt: {prompt}")
             
-            # search_results = [self.web_search(query) for query in generated_quires]
-            search_results = self.web_search(prompt)
+            search_results = [', '.join([result['body'] for result in self.web_search(query)]) for query in generated_quires]
+            # search_results = self.web_search(prompt)
 
 
             logger.info(f"The search result: {search_results}")
 
-
-
-            # distill_prompt = self.prompt_set.get_distill_websearch_prompt(
-            #    question=input["task"], query=query, results='.\n'.join(search_results))
+            distill_prompt = self.prompt_set.get_distill_websearch_prompt(
+               question=input["task"], query=query, results='.\n'.join(search_results))
             
-            # response = await self.llm.agen(distill_prompt)
-            response = search_results
-
+            message = [Message(role="system", content=f"You are a {self.role}."),
+                       Message(role="user", content=distill_prompt)]
+                        
+            response = await self.llm.agen(message)
+            # response = search_results
+            
             executions =  {"operation": self.node_name,
                             "task": task, 
                             "files": input.get("files", []),
                             "input": query,
-                            # "subtask": distill_prompt,
+                            "subtask": distill_prompt,
                             "output": response,
-                            "format": "natural language"}
+                            "format": "natural language"}   
 
             self.memory.add(self.id, executions)
             outputs.append(executions)

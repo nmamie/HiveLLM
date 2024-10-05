@@ -102,18 +102,33 @@ from accelerate import Accelerator
 # device = 3
 # model.to("cuda:{}".format(device))
 # tokenizer = AutoTokenizer.from_pretrained("OuteAI/Lite-Oute-2-Mamba2Attn-Instruct")
-model = None
+models = None
 curr_inf = False
 
 def load_model(inference: bool = False):
     if inference is True:
         model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
     # else: model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    else: model_id = "meta-llama/Llama-3.2-3B-Instruct"
+    else: 
+        
+        model_id1 = "meta-llama/Llama-3.2-3B-Instruct"
+        model_id2 = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
-    hf_pipeline = transformers.pipeline(
+    models = []
+
+    hf_pipeline1 = transformers.pipeline(
             "text-generation",
-            model=model_id,
+            model=model_id1,
+            model_kwargs={
+                "torch_dtype": torch.bfloat16,
+                        },
+            # trust_remote_code=True,
+            device_map="auto",
+        )
+    
+    hf_pipeline2 = transformers.pipeline(
+            "text-generation",
+            model=model_id2,
             model_kwargs={
                 "torch_dtype": torch.bfloat16,
                         },
@@ -122,10 +137,14 @@ def load_model(inference: bool = False):
         )
 
     accelerator = Accelerator()
-    model = accelerator.prepare(hf_pipeline)
-
+    
+    model1 = accelerator.prepare(hf_pipeline1)
+    model2 = accelerator.prepare(hf_pipeline2)
+    models.append(model1)
+    models.append(model2)
+    
     print('Model loaded')
-    return model
+    return models
 
 # import pdb; pdb.set_trace()
 
@@ -135,7 +154,7 @@ def hugging_chat(
     model_name,
     messages: List[str],
     max_tokens: int = 30,
-    temperature: float = 0.0,
+    temperature: float = 0.2,
     num_comps=1,
     return_cost=False,
 ) -> Union[List[str], str]:
@@ -188,26 +207,26 @@ async def hugging_achat(
     model_name,
     messages: List[str],
     max_tokens: int = 30,
-    temperature: float = 0.0,
+    temperature: float = 0.2,
     inference: bool = False,
     num_comps=1,
     return_cost=False,
 ) -> Union[List[str], bool]:
-    global model
+    global models
     global curr_inf
     if messages[0] == '$skip$':
         return ''
     
     formatted_messages = [asdict(message) for message in messages]
-    
+        
     len_messages = sum([len(message["content"]) for message in formatted_messages])
         
     # input_ids = tokenizer.apply_chat_template(
     #     formatted_messages, add_generation_prompt=True, return_tensors="pt"
     # ).to(device)
     
-    if model is None or curr_inf != inference:
-        model = load_model(inference=inference)
+    if models is None or curr_inf != inference:
+        models = load_model(inference=inference)
         curr_inf = inference
     
     if temperature > 0.0:
@@ -220,7 +239,9 @@ async def hugging_achat(
         temperature = None
         repetition_penalty = None
             
-    assert model is not None, "Model not loaded"
+    assert models is not None, "Model not loaded"
+    
+    model = random.choice(models)
 
     try:
         with async_timeout.timeout(20):
@@ -247,7 +268,6 @@ async def hugging_achat(
         
     if num_comps == 1:
         # cost_count(response, model_name, float(len_messages), float(len(answer))) #TODO
-        print(f"Answer: {answer}")
         return response[0]["generated_text"][-1]['content']
 
     cost_count(response, model_name, len_messages, len(answer))

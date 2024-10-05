@@ -49,7 +49,36 @@ class SearchAPIEngine():
             return ''
         
 class SearchEngine():
-    def search(self, keywords: str, model: str = "gpt-4o-mini", timeout: int = 30) -> str:
+    
+    def search(
+        self,
+        keywords: str,
+        region: str = "wt-wt",
+        safesearch: str = "moderate",
+        timelimit: str | None = None,
+        backend: str = "api",
+        max_results: int = 10,
+    ) -> list[dict[str, str]]:
+        """DuckDuckGo text search generator. Query params: https://duckduckgo.com/params.
+
+        Args:
+            keywords: keywords for query.
+            region: wt-wt, us-en, uk-en, ru-ru, etc. Defaults to "wt-wt".
+            safesearch: on, moderate, off. Defaults to "moderate".
+            timelimit: d, w, m, y. Defaults to None.
+            backend: api, html, lite. Defaults to api.
+                api - collect data from https://duckduckgo.com,
+                html - collect data from https://html.duckduckgo.com,
+                lite - collect data from https://lite.duckduckgo.com.
+            max_results: max number of results. If None, returns results only from the first response. Defaults to None.
+
+        Returns:
+            List of dictionaries with search results.
+        """
+        results = DDGS().text(keywords, region, safesearch, timelimit, backend, max_results)
+        return results
+    
+    def chat(self, keywords: str, model: str = "gpt-4o-mini", timeout: int = 30) -> str:
         """Initiates a chat session with DuckDuckGo AI.
 
         Args:
