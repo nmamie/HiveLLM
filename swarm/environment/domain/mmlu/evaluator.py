@@ -256,7 +256,7 @@ class Evaluator():
                     record = dataset[idx.item()]
                     yield record
 
-        loader = infinite_data_loader()
+        loader = list(infinite_data_loader())
         
         # node and edge statistics
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
