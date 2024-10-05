@@ -167,4 +167,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    # set spawn method for multiprocessing
+    torch.multiprocessing.set_start_method('spawn')
     asyncio.run(main())
