@@ -58,7 +58,7 @@ def parse_args():
 
     #ALGO SPECIFIC ARGS
     parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
-    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=2) #5
+    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=1) #5
     parser.add_argument('--gradperstep', type=float, help='#Gradient step per env step',  default=1.0)
     parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=5)
 

@@ -87,4 +87,4 @@ class GymWrapper:
         #     if terminate: break       
                     
         # next_state = np.expand_dims(next_state, axis=0)
-        return next_state, reward, terminate, final_answers, record
+        return next_state, reward, terminate, final_answers
