@@ -97,4 +97,3 @@ class DDQN(object):
 
         self.num_updates += 1
         soft_update(self.actor_target, self.actor, self.tau)
-        print("Q Loss:", q_loss.item())

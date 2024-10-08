@@ -41,8 +41,8 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='Seed', default=991)
     parser.add_argument('--savetag', type=str, help='#Tag to append to savefile',  default='')
     parser.add_argument('--gpu_id', type=int, help='#GPU ID ',  default=0)
-    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.01)
-    parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.01)
+    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.001)
+    parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.001)
     # parser.add_argument('--frameskip', type=int, help='Frameskip',  default=1)
 
     parser.add_argument('--node_feature_size', type=int, help='#Node Feature size',  default=64)
@@ -52,15 +52,15 @@ def parse_args():
     parser.add_argument('--tau', type=float, help='Tau', default=1e-3)
     parser.add_argument('--gamma', type=float, help='Discount Rate', default=0.99)
     parser.add_argument('--alpha', type=float, help='Alpha for Entropy term ',  default=0.1)
-    parser.add_argument('--batchsize', type=int, help='Batch size',  default=16) #64
+    parser.add_argument('--batchsize', type=int, help='Batch size',  default=64) #64
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=64)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=256)
 
     #ALGO SPECIFIC ARGS
     parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
-    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=3) #5
+    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=2) #5
     parser.add_argument('--gradperstep', type=float, help='#Gradient step per env step',  default=1.0)
-    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=1)
+    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=5)
 
     # args = parser.parse_args()
     
