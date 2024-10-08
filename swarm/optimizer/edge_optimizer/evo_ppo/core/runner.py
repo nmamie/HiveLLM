@@ -33,7 +33,7 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
             else: action = net.clean_action(state, edge_index, sentence)
             
             # action = utils.to_numpy(action)
-            next_state, reward, done, info, record = env.step(action.flatten())  # Simulate one step in environment
+            next_state, reward, done, info = env.step(action.flatten(), record)  # Simulate one step in environment
             # next_state = utils.to_tensor(next_state)
             fitness += reward
             

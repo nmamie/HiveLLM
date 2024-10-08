@@ -59,7 +59,7 @@ class GymWrapper:
         record = next(self.loader)
         return state, record
 
-    def step(self, action): #Expects a numpy action
+    def step(self, action, record): #Expects a numpy action
         """Take an action to forward the simulation
 
             Parameters:
@@ -80,10 +80,11 @@ class GymWrapper:
         rewards = 0
         terminate = False
         current_node_id = self.idx2node[action.item()]
-        for i, record in zip(range(self.batch_size), self.loader):
-            next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
-            rewards += reward
-            if terminate: break       
+        next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
+        # for i, record in zip(range(self.batch_size), self.loader): # TODO: same record needs to propagate through the computation graph
+        #     next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
+        #     rewards += reward
+        #     if terminate: break       
                     
         # next_state = np.expand_dims(next_state, axis=0)
         return next_state, reward, terminate, final_answers, record
