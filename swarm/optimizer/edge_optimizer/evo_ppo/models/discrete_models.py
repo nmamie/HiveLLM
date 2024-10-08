@@ -11,14 +11,14 @@ from swarm.optimizer.edge_optimizer.graph_net.layers import GraphAttentionLayer
 from transformers import BertModel, BertTokenizer
 
 
-# Load pre-trained BERT model and tokenizer
-# Using a distilled BERT model (smaller and faster with fewer parameters)
-bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda') # type: ignore
-tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
+# # Load pre-trained BERT model and tokenizer
+# # Using a distilled BERT model (smaller and faster with fewer parameters)
+# bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda') # type: ignore
+# tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
 
-# Freeze BERT model parameters
-for param in bert.parameters():
-    param.requires_grad = False
+# # Freeze BERT model parameters
+# for param in bert.parameters():
+#     param.requires_grad = False
 
 
 class CategoricalGATPolicy(nn.Module):
@@ -39,11 +39,11 @@ class CategoricalGATPolicy(nn.Module):
         
         self.conv1 = GATConv(num_node_features, hidden_channels, heads=num_heads, dropout=0.6)
         self.conv2 = GATConv(hidden_channels * num_heads, 1, dropout=0.6, heads=1, concat=False)
-        self.fc0 = Linear(768, num_node_features)
+        # self.fc0 = Linear(768, num_node_features)
         # self.fc1 = Linear(num_node_features * 2, num_node_features)                
         
             
-    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True):
+    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
         
         edge_index = edge_index
         
@@ -52,32 +52,67 @@ class CategoricalGATPolicy(nn.Module):
         # # normalize node features
         # x = F.normalize(x, p=2, dim=-1)
         
-        inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True)
-        with torch.no_grad():
-            sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
-            sentence_embedding = sentence_embedding.squeeze(0)
-            print("Sentence embedding:", sentence_embedding)
+        # inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True)
+        # inputs = inputs.to(bert.device)
+        # with torch.no_grad():
+        #     sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
+        #     sentence_embedding = sentence_embedding.squeeze(0)
+        #     # print("Sentence embedding:", sentence_embedding)
         
-        # sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
-        # x = torch.cat([x, sentence_embedding_repeat], dim=1)
-        sentence_embedding = self.fc0(sentence_embedding)
-        x_enc = x + sentence_embedding
+        # # sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
+        # # x = torch.cat([x, sentence_embedding_repeat], dim=1)
+        # sentence_embedding = sentence_embedding.to(x.device)
+        # sentence_embedding = self.fc0(sentence_embedding)
+        # x_enc = x + sentence_embedding
                 
         # Pass through the GAT layers
-        x = self.conv1(x_enc, edge_index)
+        x = self.conv1(x, edge_index)
         x = F.elu(x)
         logits, attention = self.conv2(x, edge_index, return_attention_weights=True)
-                
-        # print(f"Node embeddings: {x}")
+        
+        # x = F.relu(self.fc1(x))
+        
+        num_nodes_per_graph = x.shape[0] // batch_size
+        logits = torch.reshape(logits, (batch_size, num_nodes_per_graph))
         
         if return_only_action:
-            return logits.argmax(0)
+            return logits.argmax(1)
         
+        # if return_only_action:
+        #     # Constants
+        #     num_edges_per_graph = 4  # Example: total number of edges each graph has
+        #     num_nodes_per_graph = 3   # Example: total number of nodes each graph has
+        #     batch_size = edge_index.shape[1] // num_edges_per_graph  # Calculate based on total edges
+            
+        #     if batch_size == 1:
+        #         # restrict to actions reachable from the current node
+        #         pos_logits = [True if node in edge_index[1] else False for node in range(self.action_dim)]
+        #         logits_masked = logits[pos_logits]
+        #         return logits_masked.argmax(1)   
+        #     else:
+        #         pos_logits = torch.zeros((batch_size, self.action_dim), dtype=torch.bool)
+
+        #         # Iterate over each graph in the batch
+        #         for i in range(batch_size):
+        #             # Calculate start and end indices for edges in edge_index
+        #             start_edge = i * num_edges_per_graph
+        #             end_edge = start_edge + num_edges_per_graph
+                    
+        #             # Get the reachable nodes for the i-th graph
+        #             reachable_nodes = edge_index[1, start_edge:end_edge]  # Use edge_index[1] for target nodes
+                    
+        #             # Fill the pos_logits for the i-th graph
+        #             pos_logits[i] = torch.tensor([node in reachable_nodes.tolist() for node in range(self.action_dim)], dtype=torch.bool)
+
+        #         # Use the boolean mask to index logits
+        #         logits_masked = logits[pos_logits.view(-1)]  # Flatten pos_logits for indexing
+        #         return logits_masked.argmax(1)  # Get actions for each sample in the batch                 
+            
         return None, None, logits
 
 
-    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True):
-        _, _, logits = self.clean_action(x, edge_index, sentence, return_only_action=False)
+    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
+        _, _, logits = self.clean_action(x, edge_index, sentence, return_only_action=False, batch_size=batch_size)
 
         dist = Categorical(logits=logits)
         action = dist.sample()

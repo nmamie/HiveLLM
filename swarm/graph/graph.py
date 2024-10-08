@@ -3,7 +3,7 @@
 
 import asyncio
 import shortuuid
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Tuple
 from copy import deepcopy
 from abc import ABC, abstractmethod
 import async_timeout
@@ -190,7 +190,7 @@ class Graph(ABC):
         
     async def reset(self,
                     node_features: torch.Tensor,
-                    node2idx: Dict[str, int]) -> torch.Tensor:
+                    node2idx: Dict[str, int]) -> Tuple[torch.Tensor, torch.Tensor, str]:
         def is_node_useful(node):
             if node in self.output_nodes:
                 return True
@@ -200,13 +200,28 @@ class Graph(ABC):
                     return True
             return False
         
-        useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
-        in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in useful_node_ids}
-        zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
+        self.useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
+        in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in self.useful_node_ids}
+        zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in self.useful_node_ids]
         
         current_node_id = zero_in_degree_queue.pop(0)
-        state = node_features[node2idx[current_node_id]]
-        return state, current_node_id
+        
+        # create edge index from current node
+        # edge_index = []
+        # for node in self.nodes.values():
+        #     for successor in node.successors:
+        #         if successor.id in useful_node_ids:
+        #             edge_index.append([node2idx[node.id], node2idx[successor.id]])
+        # edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        edge_index = []
+        current_node = self.nodes[current_node_id]
+        for successor in current_node.successors:
+            if successor.id in self.useful_node_ids:
+                edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        
+        state = node_features
+        return state, edge_index, current_node_id
     
     
     async def step(self, dataset: List[Dict[str, Any]],
@@ -237,12 +252,20 @@ class Graph(ABC):
             input_node.inputs = [node_input]
         
         final_answers = []
-        next_state = node_features[action]
+        next_state = node_features
         
         # policy step
+        edge_index = []
         current_node = self.nodes[current_node_id]
-        if current_node in self.output_nodes:
+        for successor in current_node.successors:
+            if successor.id in self.useful_node_ids:
+                edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
+        edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        # current_node = self.nodes[current_node_id]
+        if not current_node.successors:
             terminate = True
+        else: 
+            terminate = False
         # else:
         #     state = node_features[node2idx[current_node_id]]
         #     _, node_features, attention = policy(node_features, edge_index)
@@ -275,7 +298,7 @@ class Graph(ABC):
         #             zero_in_degree_queue.append(successor.id)
 
     
-        if current_node in self.output_nodes:
+        if terminate:
             output_messages = current_node.outputs
             
             if len(output_messages) > 0 and not return_all_outputs:
@@ -301,13 +324,14 @@ class Graph(ABC):
             current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
             current_answer_post = dataset.postprocess_answer(current_answer)
             if current_answer_post == correct_answer:
-                reward = 0
-            else:
                 reward = -1
+            else:
+                reward = -5
         
         if len(final_answers) == 0:
             final_answers.append("No answer since there are no inputs provided")
-        return next_state, reward, terminate, final_answers, current_node_id
+            
+        return next_state, reward, terminate, final_answers, current_node_id, edge_index
             
 
     def find_node(self, id: str):

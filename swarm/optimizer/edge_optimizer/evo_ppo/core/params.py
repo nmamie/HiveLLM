@@ -31,6 +31,7 @@ class Parameters:
         self.batch_size = vars(parser.parse_args())['batchsize']
         self.rollout_size = vars(parser.parse_args())['rollsize']
 
+        self.node_feature_size = vars(parser.parse_args())['node_feature_size']
         self.hidden_size = vars(parser.parse_args())['hidden_size']
         self.critic_lr = vars(parser.parse_args())['critic_lr']
         self.actor_lr = vars(parser.parse_args())['actor_lr']

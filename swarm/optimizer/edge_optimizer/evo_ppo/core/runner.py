@@ -8,7 +8,7 @@ from copy import deepcopy
 # Rollout evaluate an agent in a complete game
 @torch.no_grad()
 def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, env_constructor):
-    
+    print(f"Rollout worker {id} started")
     env = env_constructor.make_env()
     np.random.seed(id) ###make sure the random seeds across learners are different
     
@@ -33,16 +33,15 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
             else: action = net.clean_action(state, edge_index, sentence)
             
             # action = utils.to_numpy(action)
-            next_state, reward, done, info, record = env.step(action.flatten(), state)  # Simulate one step in environment
-            
+            next_state, reward, done, info, record = env.step(action.flatten())  # Simulate one step in environment
             # next_state = utils.to_tensor(next_state)
             fitness += reward
             
             # If storing transitions
             if store_data: #Skip for test set
                 rollout_trajectory.append([utils.to_numpy(state), utils.to_numpy(next_state),
-                                        np.float32(action), np.reshape(np.float32(np.array([reward])), (1, 1)),
-                                           np.reshape(np.float32(np.array([float(done)])), (1, 1))])
+                                        np.float32(action), np.float32(np.array([reward])),
+                                        utils.to_numpy(edge_index), np.float32(np.array([float(done)]))])
             state = next_state
             total_frame += 1
 

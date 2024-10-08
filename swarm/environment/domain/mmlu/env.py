@@ -1,5 +1,7 @@
 import asyncio
+from typing import Iterator
 import numpy as np
+import pandas as pd
 
 class GymWrapper:
     """Wrapper around the Environment to expose a cleaner interface for RL
@@ -9,14 +11,14 @@ class GymWrapper:
 
 
     """
-    def __init__(self, swarm, dataset, loader, num_pot_edges, num_nodes, num_node_features, node_features, node2idx, edge_index, batch_size):
+    def __init__(self, swarm, dataset, num_pot_edges, num_nodes, num_node_features, node_features, node2idx, idx2node, edge_index, batch_size):
         """
         A base template for all environment wrappers.
         """
         self.env = swarm.composite_graph
         self.is_discrete = True
         self.dataset = dataset
-        self.loader = loader
+        # self.loader = loader
         self.num_pot_edges = num_pot_edges
         self.num_nodes = num_nodes
         self.num_node_features = num_node_features
@@ -24,6 +26,7 @@ class GymWrapper:
         self.current_node_id = None
         self.node_features = node_features
         self.node2idx = node2idx
+        self.idx2node = idx2node
         self.edge_index = edge_index
         
         #State and Action Parameters
@@ -31,6 +34,18 @@ class GymWrapper:
         if self.is_discrete:
             self.action_dim = self.num_nodes
         self.test_size = 10
+
+        self.loader = self._infinite_data_loader()
+        
+        print("Env Initialized")
+
+    
+    def _infinite_data_loader(self) -> Iterator[pd.DataFrame]:
+            perm = np.random.permutation(len(self.dataset))
+            while True:
+                for idx in perm:
+                    record = self.dataset[idx.item()]
+                    yield record
 
     def reset(self):
         """Method overloads reset
@@ -40,8 +55,7 @@ class GymWrapper:
             Returns:
                 next_obs (list): Next state
         """
-        state, current_node_id = self.env.reset(self.node_features, self.node2idx)
-        self.current_node_id = current_node_id
+        state, self.edge_index, self.current_node_id = asyncio.run(self.env.reset(self.node_features, self.node2idx))
         record = next(self.loader)
         return state, record
 
@@ -65,12 +79,11 @@ class GymWrapper:
 
         rewards = 0
         terminate = False
-        current_node_id = self.current_node_id
+        current_node_id = self.idx2node[action.item()]
         for i, record in zip(range(self.batch_size), self.loader):
-            next_state, reward, terminate, final_answers, current_node_id = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
-            self.current_node_id = current_node_id
+            next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
             rewards += reward
-            if terminate: break        
-        
+            if terminate: break       
+                    
         # next_state = np.expand_dims(next_state, axis=0)
         return next_state, reward, terminate, final_answers, record

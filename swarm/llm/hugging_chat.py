@@ -247,10 +247,10 @@ async def hugging_achat(
         
     if num_comps == 1:
         # cost_count(response, model_name, float(len_messages), float(len(answer))) #TODO
-        print(f"Answer: {answer}")
+        # print(f"Answer: {answer}")
         return response[0]["generated_text"][-1]['content']
 
-    cost_count(response, model_name, len_messages, len(answer))
+    # cost_count(response, model_name, len_messages, len(answer))
 
     return [resp["generated_text"][-1]['content'] for resp in response]
 

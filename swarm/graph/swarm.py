@@ -36,6 +36,9 @@ class Swarm:
                  init_connection_probability: float = 0.5,
                  connect_output_nodes_to_final_node: bool = False,
                  include_inner_agent_connections: bool = True,
+                 node_feature_size: int = 64,
+                 hidden_size: int = 16,
+                #  args: Optional[Any] = None,
                  ):
         
         self.id = shortuuid.ShortUUID().random(length=4)    
@@ -50,6 +53,8 @@ class Swarm:
         self.node_optimize = node_optimize
         self.init_connection_probability = init_connection_probability
         self.connect_output_nodes_to_final_node = connect_output_nodes_to_final_node
+        self.node_feature_size = node_feature_size
+        self.hidden_size = hidden_size
         self.organize(include_inner_agent_connections)
         print(f"Swarm {self.id} has been created.")
 
@@ -101,8 +106,8 @@ class Swarm:
                 for node in agent.nodes:
                     if node in [output_node.id for output_node in agent.output_nodes]:
                         agent.nodes[node].add_successor(decision_method)
-
-        self.connection_dist = EdgeWiseDistribution(potential_connections, self.init_connection_probability)
+        
+        self.connection_dist = EdgeWiseDistribution(potential_connections, self.node_feature_size, self.hidden_size, self.init_connection_probability)
         self.potential_connections = potential_connections
 
     def visualize_adj_matrix_distribution(self, logits):

@@ -11,6 +11,7 @@ import numpy as np
 import json
 import math
 import copy
+import pickle
 
 from swarm.optimizer.edge_optimizer.evo_ppo.envs_repo.constructor import EnvConstructor
 from swarm.optimizer.edge_optimizer.evo_ppo.models.constructor import ModelConstructor
@@ -249,26 +250,49 @@ class Evaluator():
                                model_name=self._model_name
                                ), f)
 
-        def infinite_data_loader() -> Iterator[pd.DataFrame]:
-            perm = np.random.permutation(len(dataset))
-            while True:
-                for idx in perm:
-                    record = dataset[idx.item()]
-                    yield record
+        # def infinite_data_loader() -> Iterator[pd.DataFrame]:
+        #     perm = np.random.permutation(len(dataset))
+        #     while True:
+        #         for idx in perm:
+        #             record = dataset[idx.item()]
+        #             yield record
 
-        loader = list(infinite_data_loader())
+        # loader = infinite_data_loader()
         
         # node and edge statistics
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
-        num_node_features = 64
+        num_node_features = self.args.node_feature_size
         
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(self._swarm, dataset, loader, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.edge_index, batch_size)
+        env_constructor = EnvConstructor(self._swarm, dataset, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size)
 
+        # try:
+        #     pickle.dumps(self._swarm)
+        #     print("Swarm is pickleable")
+        #     pickle.dumps(dataset)
+        #     print("Dataset is pickleable")
+        #     pickle.dumps(num_pot_edges)
+        #     print("num_pot_edges is pickleable")
+        #     pickle.dumps(num_nodes)
+        #     print("num_nodes is pickleable")
+        #     pickle.dumps(num_node_features)
+        #     print("num_node_features is pickleable")
+        #     pickle.dumps(self._swarm.connection_dist.node_features)
+        #     print("node_features is pickleable")
+        #     pickle.dumps(self._swarm.connection_dist.node_id2idx)
+        #     print("node_id2idx is pickleable")
+        #     pickle.dumps(self._swarm.connection_dist.node_idx2id)
+        #     print("node_idx2id is pickleable")
+        #     pickle.dumps(self._swarm.connection_dist.edge_index)
+        #     print("edge_index is pickleable")
+        #     pickle.dumps(batch_size)
+        #     print("All objects are pickleable")
+        # except Exception as e:
+        #     print(f"Cannot pickle object: {e}")
 
         #######################  Actor, Critic and ValueFunction Model Constructor ######################
         model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, self.args.hidden_size)
         
-        ai = ERL_Trainer(self.args, model_constructor, env_constructor)
+        ai = ERL_Trainer(self.args, model_constructor, env_constructor, num_nodes, num_pot_edges)
         ai.train(self.args.total_steps)

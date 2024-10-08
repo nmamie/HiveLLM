@@ -8,11 +8,13 @@ import torch
 
 class ERL_Trainer:
 
-	def __init__(self, args, model_constructor, env_constructor):
+	def __init__(self, args, model_constructor, env_constructor, num_nodes, num_edges):
 
 		self.args = args
 		self.policy_string = 'CategoricalPolicy' if env_constructor.is_discrete else 'Gaussian_FF'
 		self.manager = Manager()
+		self.num_nodes = num_nodes
+		self.num_edges = num_edges
 		self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 		#Evolution
@@ -99,8 +101,8 @@ class ERL_Trainer:
 		############# UPDATE PARAMS USING GRADIENT DESCENT ##########
 		if self.replay_buffer.__len__() > self.args.learning_start: ###BURN IN PERIOD
 			for _ in range(int(self.gen_frames * self.args.gradperstep)):
-				s, ns, a, r, done = self.replay_buffer.sample(self.args.batch_size)
-				self.learner.update_parameters(s, ns, a, r, done)
+				s, ns, a, r, e, done = self.replay_buffer.sample(self.args.batch_size)
+				self.learner.update_parameters(s, ns, a, r, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
 
 			self.gen_frames = 0
 

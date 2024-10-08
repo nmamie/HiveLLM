@@ -37,7 +37,7 @@ def parse_args():
                         help="Set for a quick debug cycle")
     
     #######################  COMMANDLINE - ARGUMENTS ######################
-    parser.add_argument('--env', type=str, help='Env Name',  default='Pendulum-v0')
+    parser.add_argument('--env', type=str, help='Env Name',  default='MMLU')
     parser.add_argument('--seed', type=int, help='Seed', default=991)
     parser.add_argument('--savetag', type=str, help='#Tag to append to savefile',  default='')
     parser.add_argument('--gpu_id', type=int, help='#GPU ID ',  default=0)
@@ -45,21 +45,22 @@ def parse_args():
     parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.01)
     # parser.add_argument('--frameskip', type=int, help='Frameskip',  default=1)
 
-    parser.add_argument('--hidden_size', type=int, help='#Hidden Layer size',  default=8)
+    parser.add_argument('--node_feature_size', type=int, help='#Node Feature size',  default=64)
+    parser.add_argument('--hidden_size', type=int, help='#Hidden Layer size',  default=16)
     parser.add_argument('--critic_lr', type=float, help='Critic learning rate?', default=3e-4)
     parser.add_argument('--actor_lr', type=float, help='Actor learning rate?', default=1e-4)
     parser.add_argument('--tau', type=float, help='Tau', default=1e-3)
     parser.add_argument('--gamma', type=float, help='Discount Rate', default=0.99)
     parser.add_argument('--alpha', type=float, help='Alpha for Entropy term ',  default=0.1)
-    parser.add_argument('--batchsize', type=int, help='Seed',  default=64)
+    parser.add_argument('--batchsize', type=int, help='Batch size',  default=16) #64
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=512)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=64)
 
     #ALGO SPECIFIC ARGS
-    parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10)
-    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=5)
+    parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
+    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=3) #5
     parser.add_argument('--gradperstep', type=float, help='#Gradient step per env step',  default=1.0)
-    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=5)
+    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=1)
 
     # args = parser.parse_args()
     
@@ -105,6 +106,8 @@ async def main():
             final_node_class="FinalDecision",
             final_node_kwargs=dict(strategy=strategy),
             edge_optimize=True,
+            node_feature_size = args.node_feature_size,
+            hidden_size = args.hidden_size,
         )
 
     tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}"
