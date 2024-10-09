@@ -279,6 +279,9 @@ class Graph(ABC):
         # action = torch.tensor([node2idx[current_node_id]], dtype=torch.long)
         # next_state = node_features[node2idx[current_node_id]]
         
+        # reward
+        reward = 0
+        
         tries = 0
         while tries < max_tries:
             try:
@@ -286,8 +289,10 @@ class Graph(ABC):
                 break
             except asyncio.TimeoutError:
                 print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
+                reward -= 100
             except Exception as e:
                 print(f"Error during execution of node {current_node_id}: {e}")
+                reward -= 100
                 break
             tries += 1
 
@@ -301,32 +306,43 @@ class Graph(ABC):
         if terminate:
             output_messages = current_node.outputs
             
-            if len(output_messages) > 0 and not return_all_outputs:
+            if len(output_messages) > 0:            
                 final_answer = output_messages[-1].get("output", output_messages[-1])
                 final_answer_post = dataset.postprocess_answer(final_answer)
+                final_answers.append(final_answer)
                 if final_answer_post == correct_answer:
-                    reward = 100
+                    reward += 100
                 else:
-                    reward = -100
+                    reward -= 100
             else:
-                reward = 0
-                for output_message in output_messages:
-                    final_answer = output_message.get("output", output_message)
-                    final_answers.append(final_answer)
-                    final_answer_post = dataset.postprocess_answer(final_answer)
-                    if final_answer_post == correct_answer:
-                        reward += 100
-                    else:
-                        reward -= 100
+                reward -= 100
+            
+            # if len(output_messages) > 0 and not return_all_outputs:
+            #     final_answer = output_messages[-1].get("output", output_messages[-1])
+            #     final_answer_post = dataset.postprocess_answer(final_answer)
+            #     if final_answer_post == correct_answer:
+            #         reward = 100
+            #     else:
+            #         reward = -100
+            # else:
+            #     reward = 0
+            #     for output_message in output_messages:
+            #         final_answer = output_message.get("output", output_message)
+            #         final_answers.append(final_answer)
+            #         final_answer_post = dataset.postprocess_answer(final_answer)
+            #         if final_answer_post == correct_answer:
+            #             reward += 100
+            #         else:
+            #             reward -= 100
                         
         else:
             # check answer of current node to get reward
             current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
             current_answer_post = dataset.postprocess_answer(current_answer)
             if current_answer_post == correct_answer:
-                reward = -1
+                reward -= 1
             else:
-                reward = -5
+                reward -= 10
         
         if len(final_answers) == 0:
             final_answers.append("No answer since there are no inputs provided")

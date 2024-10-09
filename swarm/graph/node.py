@@ -157,5 +157,5 @@ class Node(ABC):
         formatted_items = '\n    '.join(
             f"\033[1;34m{key}\033[0m: {value}" for key, value in last_item.items() if key not in ignore_keys)
         formatted_output = f"Memory Records for ID \033[1;35m{self.id}\033[0m:\n    {formatted_items}"
-        logger.info(formatted_output)
+        # logger.info(formatted_output)
 

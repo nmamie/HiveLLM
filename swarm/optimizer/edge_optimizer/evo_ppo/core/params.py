@@ -15,6 +15,7 @@ class Parameters:
         # Experiment args
         self.mode = vars(parser.parse_args())['mode']
         self.debug = vars(parser.parse_args())['debug']
+        self.gpu_id = vars(parser.parse_args())['gpu_id']
         self.model_name = vars(parser.parse_args())['model_name']
         self.num_truthful_agents = vars(parser.parse_args())['num_truthful_agents']
         self.domain = vars(parser.parse_args())['domain']

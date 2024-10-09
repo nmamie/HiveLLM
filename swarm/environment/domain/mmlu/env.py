@@ -15,7 +15,7 @@ class GymWrapper:
         """
         A base template for all environment wrappers.
         """
-        self.env = swarm.composite_graph
+        self.env = swarm
         self.is_discrete = True
         self.dataset = dataset
         # self.loader = loader

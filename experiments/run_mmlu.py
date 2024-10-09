@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='Seed', default=991)
     parser.add_argument('--savetag', type=str, help='#Tag to append to savefile',  default='')
     parser.add_argument('--gpu_id', type=int, help='#GPU ID ',  default=0)
-    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.001)
+    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.01)
     parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.001)
     # parser.add_argument('--frameskip', type=int, help='Frameskip',  default=1)
 
@@ -54,13 +54,13 @@ def parse_args():
     parser.add_argument('--alpha', type=float, help='Alpha for Entropy term ',  default=0.1)
     parser.add_argument('--batchsize', type=int, help='Batch size',  default=64) #64
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=256)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=512)
 
     #ALGO SPECIFIC ARGS
     parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
-    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=1) #5
+    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=2) #5
     parser.add_argument('--gradperstep', type=float, help='#Gradient step per env step',  default=1.0)
-    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=5)
+    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=4)
 
     # args = parser.parse_args()
     

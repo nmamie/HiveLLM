@@ -4,6 +4,7 @@ from swarm.optimizer.edge_optimizer.evo_ppo.core import utils
 from swarm.optimizer.edge_optimizer.evo_ppo.core.runner import rollout_worker
 from torch.multiprocessing import Process, Pipe, Manager
 from swarm.optimizer.edge_optimizer.evo_ppo.core.buffer import Buffer
+from swarm.utils.log import logger
 import torch
 
 class ERL_Trainer:
@@ -15,7 +16,7 @@ class ERL_Trainer:
 		self.manager = Manager()
 		self.num_nodes = num_nodes
 		self.num_edges = num_edges
-		self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+		self.device = torch.device(args.gpu_id if torch.cuda.is_available() else "cpu")
 
 		#Evolution
 		self.evolver = SSNE(self.args)
@@ -185,14 +186,12 @@ class ERL_Trainer:
 			max_fitness, champ_len, all_eplens, test_mean, test_std, rollout_fitness, rollout_eplens = self.forward_generation(gen, test_tracker)
 			if test_mean: self.args.writer.add_scalar('test_score', test_mean, gen)
 
-			print('Gen/Frames:', gen,'/',self.total_frames,
-				  ' Gen_max_score:', '%.2f'%max_fitness,
-				  ' Champ_len', '%.2f'%champ_len, ' Test_score u/std', utils.pprint(test_mean), utils.pprint(test_std),
-				  ' Rollout_u/std:', utils.pprint(np.mean(np.array(rollout_fitness))), utils.pprint(np.std(np.array(rollout_fitness))),
-				  ' Rollout_mean_eplen:', utils.pprint(sum(rollout_eplens)/len(rollout_eplens)) if rollout_eplens else None)
-
+			formatted_items = [gen, self.total_frames, max_fitness, champ_len, np.mean(all_eplens), np.mean(rollout_fitness), np.mean(rollout_eplens), test_mean, test_std]
+			logger.info('Generation:%d/Frames%d, Max:%.2f, ChampLen:%d, AvgLen:%.2f, RolloutScore:%.2f, RolloutLen:%.2f, TestScore:%.2f, TestStd:%.2f' % tuple(formatted_items))
+			
 			if gen % 5 == 0:
-				print('Best_score_ever:''/','%.2f'%self.best_score, ' FPS:','%.2f'%(self.total_frames/(time.time()-time_start)), 'savetag', self.args.savetag)
+				formatted_items = [gen, self.total_frames, max_fitness, champ_len, np.mean(all_eplens), np.mean(rollout_fitness), np.mean(rollout_eplens), test_mean, test_std]
+				logger.info('Generation:%d/Frames%d, Max:%.2f, ChampLen:%d, AvgLen:%.2f, RolloutScore:%.2f, RolloutLen:%.2f, TestScore:%.2f, TestStd:%.2f' % tuple(formatted_items))
 				print()
 
 			if self.total_frames > frame_limit:

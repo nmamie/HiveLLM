@@ -61,7 +61,7 @@ class Evaluator():
             
         self.utilities = []
             
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(args.gpu_id if torch.cuda.is_available() else 'cpu')
         
         self.args = args
 
@@ -259,13 +259,16 @@ class Evaluator():
 
         # loader = infinite_data_loader()
         
+        # realize full swarm
+        realized_graph = self._swarm.connection_dist.realize_full(self._swarm.composite_graph)
+        
         # node and edge statistics
         num_pot_edges = len(self._swarm.connection_dist.potential_connections)
         num_nodes = len(self._swarm.composite_graph.nodes)
         num_node_features = self.args.node_feature_size
         
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(self._swarm, dataset, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size)
+        env_constructor = EnvConstructor(realized_graph, dataset, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size)
 
         # try:
         #     pickle.dumps(self._swarm)

@@ -118,14 +118,14 @@ class FinalDecision(Node):
             max_freq = sorted_counter[0][1]
             equally_frequent_answers = [ans for ans, freq in sorted_counter if freq == max_freq]
             response = random.choice(equally_frequent_answers)
-            print(f"{answers=} {response=}")
+            # print(f"{answers=} {response=}")
             
         elif self.strategy == MergingStrategy.RandomChoice:
             if len(inputs) == 0:
                 raise Exception("No inputs is not supported for RandomChoice")
             answers = [input.get("output") for input in inputs]
             response = random.choice(answers)
-            print(f"{answers=} {response=}")
+            # print(f"{answers=} {response=}")
 
         elif self.strategy == MergingStrategy.SelfConsistency:  
             # This is different from MajorityVote because it is prompt-based.
@@ -139,7 +139,7 @@ class FinalDecision(Node):
             message = [Message(role="system", content=f"You are a {self.role}. {self.constraint}"),
                     Message(role="user", content=prompt)]
             response = await self.llm.agen(message)
-            print(f"{answers=} {response=}")
+            # print(f"{answers=} {response=}")
 
         elif self.strategy == MergingStrategy.SelectBest:  
             # This is different from MajorityVote because it is prompt-based.
@@ -153,7 +153,7 @@ class FinalDecision(Node):
             message = [Message(role="system", content=f"You are a {self.role}. {self.constraint}"),
                     Message(role="user", content=prompt)]
             response = await self.llm.agen(message)
-            print(f"{answers=} {response=}")
+            # print(f"{answers=} {response=}")
 
 
         else:
