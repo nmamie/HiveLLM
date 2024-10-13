@@ -57,7 +57,7 @@ class DDQN(object):
             batch = Batch.from_data_list(data_list)
                         
             na = self.actor.clean_action(batch.x, batch.edge_index, "", return_only_action=True, batch_size=batch_size)
-            _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, "", return_only_action=False, batch_size=batch_size)
+            _, _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, "", return_only_action=False, batch_size=batch_size)
             next_entropy = -(F.softmax(ns_logits, dim=1) * F.log_softmax(ns_logits, dim=1)).mean(1).unsqueeze(1)
             
             ns_logits = ns_logits.gather(1, na.unsqueeze(1))
@@ -82,7 +82,7 @@ class DDQN(object):
         # Batch the graphs
         batch = Batch.from_data_list(data_list)
 
-        _, _, logits  = self.actor.noisy_action(batch.x, batch.edge_index, "", return_only_action=False, batch_size=batch_size)
+        _, _, _, logits  = self.actor.noisy_action(batch.x, batch.edge_index, "", return_only_action=False, batch_size=batch_size)
         entropy = -(F.softmax(logits, dim=1) * F.log_softmax(logits, dim=1)).mean(1).unsqueeze(1)
         q_val = logits.gather(1, action_batch)
 

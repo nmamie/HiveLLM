@@ -59,6 +59,8 @@ class Graph(ABC):
         self.is_aggregate = False
         self.input_nodes: List[Node] = []
         self.output_nodes: List[Node] = []
+        self.state = None
+        self.num_steps = 0
         self.build_graph()
 
     @property
@@ -210,7 +212,7 @@ class Graph(ABC):
         # edge_index = []
         # for node in self.nodes.values():
         #     for successor in node.successors:
-        #         if successor.id in useful_node_ids:
+        #         if successor.id in self.useful_node_ids:
         #             edge_index.append([node2idx[node.id], node2idx[successor.id]])
         # edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         edge_index = []
@@ -220,12 +222,22 @@ class Graph(ABC):
                 edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
         edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         
-        state = node_features
-        return state, edge_index, current_node_id
+        # filter node_features based on edge_index
+        # active_nodes_mask = torch.zeros(node_features.shape[0], dtype=torch.bool)
+        # for node_id in range(node_features.shape[0]):
+        #     if node_id in edge_index[0] or node_id in edge_index[1]:
+        #         active_nodes_mask[node_id] = True
+        
+        self.state = node_features
+        self.num_steps = 0
+        
+        return self.state, edge_index, current_node_id
     
     
     async def step(self, dataset: List[Dict[str, Any]],
                       record: Dict[str, Any],
+                      state: torch.Tensor,
+                      edge_index: torch.Tensor,
                   max_tries: int = 3, 
                   max_time: int = 600, 
                   return_all_outputs: bool = False,
@@ -252,16 +264,17 @@ class Graph(ABC):
             input_node.inputs = [node_input]
         
         final_answers = []
-        next_state = node_features
+        next_state = state
+        self.state = next_state
         
-        # policy step
-        edge_index = []
-        current_node = self.nodes[current_node_id]
-        for successor in current_node.successors:
-            if successor.id in self.useful_node_ids:
-                edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        # # policy step
+        # edge_index = []
         # current_node = self.nodes[current_node_id]
+        # for successor in current_node.successors:
+        #     if successor.id in self.useful_node_ids:
+        #         edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
+        # edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        current_node = self.nodes[current_node_id]
         if not current_node.successors:
             terminate = True
         else: 
@@ -289,12 +302,14 @@ class Graph(ABC):
                 break
             except asyncio.TimeoutError:
                 print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
-                reward -= 100
+                # reward -= 100
             except Exception as e:
                 print(f"Error during execution of node {current_node_id}: {e}")
-                reward -= 100
+                # reward -= 100
                 break
             tries += 1
+            if tries == max_tries:
+                reward -= 50
 
         # for successor in current_node.successors:
         #     if successor.id in useful_node_ids:
@@ -306,7 +321,7 @@ class Graph(ABC):
         if terminate:
             output_messages = current_node.outputs
             
-            if len(output_messages) > 0:            
+            if len(output_messages) > 0:
                 final_answer = output_messages[-1].get("output", output_messages[-1])
                 final_answer_post = dataset.postprocess_answer(final_answer)
                 final_answers.append(final_answer)
@@ -324,7 +339,7 @@ class Graph(ABC):
             #         reward = 100
             #     else:
             #         reward = -100
-            # else:
+            # elif len(output_messages) > 0:
             #     reward = 0
             #     for output_message in output_messages:
             #         final_answer = output_message.get("output", output_message)
@@ -335,14 +350,24 @@ class Graph(ABC):
             #         else:
             #             reward -= 100
                         
+            # else:
+            #     reward -= 100
+                        
         else:
-            # check answer of current node to get reward
-            current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
-            current_answer_post = dataset.postprocess_answer(current_answer)
-            if current_answer_post == correct_answer:
-                reward -= 1
-            else:
-                reward -= 10
+            # # check answer of current node to get reward
+            # current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
+            # current_answer_post = dataset.postprocess_answer(current_answer)
+            # if current_answer_post == correct_answer:
+            #     reward -= 1
+            # else:
+            #     reward -= 10
+            reward -= 1
+                
+        # step counter
+        self.num_steps += 1
+        
+        # if self.num_steps % (self.num_nodes * 4) == 0:
+        #     reward -= 20
         
         if len(final_answers) == 0:
             final_answers.append("No answer since there are no inputs provided")

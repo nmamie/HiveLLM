@@ -2,13 +2,14 @@ import torch
 
 class ModelConstructor:
 
-    def __init__(self, state_dim, action_dim, hidden_size, actor_seed=None, critic_seed=None):
+    def __init__(self, state_dim, action_dim, hidden_size, potential_connections, actor_seed=None, critic_seed=None):
         """
         A general Environment Constructor
         """
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.hidden_size = hidden_size
+        self.potential_connections = potential_connections
         self.actor_seed = actor_seed
         self.critic_seed = critic_seed
 
@@ -39,7 +40,7 @@ class ModelConstructor:
 
         elif type == 'CategoricalPolicy':
             from swarm.optimizer.edge_optimizer.evo_ppo.models.discrete_models import CategoricalGATPolicy
-            model = CategoricalGATPolicy(self.state_dim, self.action_dim, self.hidden_size)
+            model = CategoricalGATPolicy(self.state_dim, self.action_dim, self.hidden_size, self.potential_connections)
 
 
         else:

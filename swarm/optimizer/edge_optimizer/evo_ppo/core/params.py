@@ -19,7 +19,8 @@ class Parameters:
         self.model_name = vars(parser.parse_args())['model_name']
         self.num_truthful_agents = vars(parser.parse_args())['num_truthful_agents']
         self.domain = vars(parser.parse_args())['domain']
-        self.num_iterations = vars(parser.parse_args())['num_iterations']        
+        self.num_iterations = vars(parser.parse_args())['num_iterations']
+        self.train = vars(parser.parse_args())['train']    
 
         #Env args
         self.env_name = vars(parser.parse_args())['env']
@@ -30,6 +31,7 @@ class Parameters:
         self.savetag = vars(parser.parse_args())['savetag']
         self.seed = vars(parser.parse_args())['seed']
         self.batch_size = vars(parser.parse_args())['batchsize']
+        self.num_envs = vars(parser.parse_args())['num_envs']
         self.rollout_size = vars(parser.parse_args())['rollsize']
 
         self.node_feature_size = vars(parser.parse_args())['node_feature_size']

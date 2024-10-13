@@ -36,6 +36,9 @@ def parse_args():
     parser.add_argument('--debug', action='store_true', default=False,
                         help="Set for a quick debug cycle")
     
+    parser.add_argument('--train', action='store_true', default=False,
+                        help="training or testing")
+    
     #######################  COMMANDLINE - ARGUMENTS ######################
     parser.add_argument('--env', type=str, help='Env Name',  default='MMLU')
     parser.add_argument('--seed', type=int, help='Seed', default=991)
@@ -52,15 +55,16 @@ def parse_args():
     parser.add_argument('--tau', type=float, help='Tau', default=1e-3)
     parser.add_argument('--gamma', type=float, help='Discount Rate', default=0.99)
     parser.add_argument('--alpha', type=float, help='Alpha for Entropy term ',  default=0.1)
-    parser.add_argument('--batchsize', type=int, help='Batch size',  default=64) #64
+    parser.add_argument('--batchsize', type=int, help='Batch size',  default=256) #64
+    parser.add_argument('--num_envs', type=int, help='Number of environments to average on',  default=4)
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=512)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=1000)
 
     #ALGO SPECIFIC ARGS
-    parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
+    parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=5) #10
     parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=2) #5
     parser.add_argument('--gradperstep', type=float, help='#Gradient step per env step',  default=1.0)
-    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=4)
+    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=2) #5
 
     # args = parser.parse_args()
     
@@ -70,7 +74,7 @@ def parse_args():
 async def main():
 
     args = Parameters(parse_args())
-    
+        
     #Set seeds
     torch.manual_seed(args.seed); np.random.seed(args.seed); random.seed(args.seed)
 
@@ -96,6 +100,7 @@ async def main():
         N = args.num_truthful_agents
         M = N
         agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
+        # agent_name_list = N * ["SpecialistAgent"]
 
         swarm_name = f"{N}true_{M}adv"
 
@@ -156,13 +161,13 @@ async def main():
         # lr = 0.01
 
         # edge_probs = await evaluator.optimize_swarm(num_iters=num_iters, lr=lr)
-        evaluator.optimize_swarm(num_iters=num_iters)
+        score = await evaluator.optimize_swarm(num_iters=num_iters)
 
-        score = await evaluator.evaluate_swarm(
-            mode='external_edge_probs',
-            edge_probs=edge_probs,
-            limit_questions=limit_questions,
-            )
+        # score = await evaluator.evaluate_swarm(
+        #     mode='external_edge_probs',
+        #     edge_probs=edge_probs,
+        #     limit_questions=limit_questions,
+        #     )
     else:
         raise Exception(f"Unsupported mode {mode}")
 

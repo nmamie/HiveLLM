@@ -112,7 +112,7 @@ class Evaluator():
                 Literal['randomly_connected_swarm'],
                 Literal['external_edge_probs'],
                 ],
-            edge_probs: Optional[torch.Tensor] = None,
+            # edge_probs: Optional[torch.Tensor] = None,
             limit_questions: Optional[int] = None,
             eval_batch_size: int = 4,
             ) -> float:
@@ -223,7 +223,7 @@ class Evaluator():
                 with open(txt_name, "w") as f:
                     f.writelines(msgs)
 
-    def optimize_swarm(
+    async def optimize_swarm(
             self,
             num_iters: int,
             lr: float = 1e-3,
@@ -232,9 +232,11 @@ class Evaluator():
 
         assert self._swarm is not None
 
-        dataset = self._train_dataset
+        train_dataset = self._train_dataset
+        val_dataset = self._val_dataset
 
-        print(f"Optimizing swarm on {dataset.__class__.__name__} split {dataset.split}")
+        print(f"Optimizing swarm on {train_dataset.__class__.__name__} split {train_dataset.split}")
+        print(f"Validating on {val_dataset.__class__.__name__} split {val_dataset.split}")
         
         # num_params = sum(p.numel() for p in self._swarm.connection_dist.parameters() if p.requires_grad)
         # params = [p for p in self._swarm.connection_dist.parameters() if p.requires_grad]
@@ -267,8 +269,13 @@ class Evaluator():
         num_nodes = len(self._swarm.composite_graph.nodes)
         num_node_features = self.args.node_feature_size
         
+        potential_connections = self._swarm.connection_dist.potential_connections
+        
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(realized_graph, dataset, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size)
+        if self.args.train:
+            env_constructor = EnvConstructor(realized_graph, train_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
+        else:
+            env_constructor = EnvConstructor(realized_graph, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
 
         # try:
         #     pickle.dumps(self._swarm)
@@ -295,7 +302,13 @@ class Evaluator():
         #     print(f"Cannot pickle object: {e}")
 
         #######################  Actor, Critic and ValueFunction Model Constructor ######################
-        model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, self.args.hidden_size)
+        model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, self.args.hidden_size, potential_connections)
         
-        ai = ERL_Trainer(self.args, model_constructor, env_constructor, num_nodes, num_pot_edges)
-        ai.train(self.args.total_steps)
+        # train and evaluate AI
+        ai = ERL_Trainer(self.args, self._swarm, model_constructor, env_constructor, num_nodes, num_pot_edges)
+        
+        # training or evaluation
+        if self.args.train:
+            ai.train(self.args.total_steps)
+        score = await ai.eval(val_dataset, limit_questions=153)
+        return score

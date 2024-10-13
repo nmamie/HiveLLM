@@ -30,89 +30,77 @@ class CategoricalGATPolicy(nn.Module):
 
     """
     
-    def __init__(self, num_node_features, action_dim, hidden_channels, num_heads=8):
+    def __init__(self, num_node_features, action_dim, hidden_channels, potential_connections, num_heads=8):
         super(CategoricalGATPolicy, self).__init__()
         
         self.num_node_features = num_node_features
         self.hidden_channels = hidden_channels
         self.action_dim = action_dim
         
+        self.potential_connections = potential_connections
+        
+        # initial_probability = 0.5
+        # init_logit = torch.log(torch.tensor(initial_probability / (1 - initial_probability)))
+        # init_tensor = torch.ones(
+        #     len(potential_connections),
+        #     requires_grad=True) * init_logit
+        # self.edge_logits = torch.nn.Parameter(init_tensor)
+        
         self.conv1 = GATConv(num_node_features, hidden_channels, heads=num_heads, dropout=0.6)
-        self.conv2 = GATConv(hidden_channels * num_heads, 1, dropout=0.6, heads=1, concat=False)
+        self.conv2 = GATConv(hidden_channels * num_heads, hidden_channels, dropout=0.6, heads=1, concat=False)
         # self.fc0 = Linear(768, num_node_features)
-        # self.fc1 = Linear(num_node_features * 2, num_node_features)                
+        # self.fc1 = Linear(num_node_features * 2, num_node_features) 
+         
+        # Learnable positional encoding for the active node
+        self.positional_encoding = nn.Parameter(torch.randn(1, num_node_features), requires_grad=True)
+        
+        # Binary state indicator
+        self.state_indicator_fc = nn.Linear(1, num_node_features)
+        
+        # Action head (for predicting the next node/action)
+        self.action_fc = nn.Linear(hidden_channels, 1)          
         
             
     def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
-        
-        edge_index = edge_index
-        
-        # print("Inputs:", x)
-        
-        # # normalize node features
-        # x = F.normalize(x, p=2, dim=-1)
-        
-        # inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True)
-        # inputs = inputs.to(bert.device)
-        # with torch.no_grad():
-        #     sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
-        #     sentence_embedding = sentence_embedding.squeeze(0)
-        #     # print("Sentence embedding:", sentence_embedding)
-        
-        # # sentence_embedding_repeat = sentence_embedding.repeat(x.shape[0], 1)
-        # # x = torch.cat([x, sentence_embedding_repeat], dim=1)
-        # sentence_embedding = sentence_embedding.to(x.device)
-        # sentence_embedding = self.fc0(sentence_embedding)
-        # x_enc = x + sentence_embedding
-                
         # Pass through the GAT layers
+        x_res = x  # Save initial embeddings for residual connection
+        
+        # conv1: GAT with multiple heads, output shape (num_nodes, hidden_channels * num_heads)
         x = self.conv1(x, edge_index)
         x = F.elu(x)
-        logits, attention = self.conv2(x, edge_index, return_attention_weights=True)
         
-        # x = F.relu(self.fc1(x))
+        # Project the original input (x_res) to the same dimensionality as the output of conv1
+        x_res = self.proj_residual(x_res, x.size(1))  # Project to match hidden_channels * num_heads
         
-        num_nodes_per_graph = x.shape[0] // batch_size
-        logits = torch.reshape(logits, (batch_size, num_nodes_per_graph))
+        x = x + x_res  # Residual connection
+        x_res = x  # Save intermediate embeddings for residual connection
+        
+        # conv2: GAT with single head (concat=False), output shape (num_nodes, hidden_channels)
+        x, attention = self.conv2(x, edge_index, return_attention_weights=True)
+        
+        # Add residual connection
+        x_res = self.proj_residual(x_res, x.size(1))  # Ensure dimensionality matches hidden_channels
+        x = x + x_res
+        
+        # Apply normalization to prevent exploding logits
+        x = F.normalize(x, p=2, dim=-1)
+
+        # Action head to predict the next node/action
+        action_logits = self.action_fc(x)  # Evaluate actions for the active node
+        action_logits = action_logits.view(batch_size, -1)  # Reshape to (batch_size, num_nodes)
+        
+        # Apply argmax on the correct dimension
+        action = action_logits.argmax(dim=1)
         
         if return_only_action:
-            return logits.argmax(1)
+            return action
         
-        # if return_only_action:
-        #     # Constants
-        #     num_edges_per_graph = 4  # Example: total number of edges each graph has
-        #     num_nodes_per_graph = 3   # Example: total number of nodes each graph has
-        #     batch_size = edge_index.shape[1] // num_edges_per_graph  # Calculate based on total edges
-            
-        #     if batch_size == 1:
-        #         # restrict to actions reachable from the current node
-        #         pos_logits = [True if node in edge_index[1] else False for node in range(self.action_dim)]
-        #         logits_masked = logits[pos_logits]
-        #         return logits_masked.argmax(1)   
-        #     else:
-        #         pos_logits = torch.zeros((batch_size, self.action_dim), dtype=torch.bool)
+        return action, x, attention, action_logits
 
-        #         # Iterate over each graph in the batch
-        #         for i in range(batch_size):
-        #             # Calculate start and end indices for edges in edge_index
-        #             start_edge = i * num_edges_per_graph
-        #             end_edge = start_edge + num_edges_per_graph
-                    
-        #             # Get the reachable nodes for the i-th graph
-        #             reachable_nodes = edge_index[1, start_edge:end_edge]  # Use edge_index[1] for target nodes
-                    
-        #             # Fill the pos_logits for the i-th graph
-        #             pos_logits[i] = torch.tensor([node in reachable_nodes.tolist() for node in range(self.action_dim)], dtype=torch.bool)
-
-        #         # Use the boolean mask to index logits
-        #         logits_masked = logits[pos_logits.view(-1)]  # Flatten pos_logits for indexing
-        #         return logits_masked.argmax(1)  # Get actions for each sample in the batch                 
-            
-        return None, None, logits
 
 
     def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
-        _, _, logits = self.clean_action(x, edge_index, sentence, return_only_action=False, batch_size=batch_size)
+        _, x, attention, logits = self.clean_action(x, edge_index, sentence, return_only_action=False, batch_size=batch_size)
 
         dist = Categorical(logits=logits)
         action = dist.sample()
@@ -121,8 +109,13 @@ class CategoricalGATPolicy(nn.Module):
         if return_only_action:
             return action
 
-        return action, None, logits
+        return action, x, attention, logits
     
+    def proj_residual(self, x_res, target_dim):
+        """Projects the residual connection to match the target dimension."""
+        if x_res.size(1) != target_dim:
+            x_res = nn.Linear(x_res.size(1), target_dim, bias=False).to(x_res.device)(x_res)
+        return x_res
     
 class CategoricalPolicy(nn.Module):
 

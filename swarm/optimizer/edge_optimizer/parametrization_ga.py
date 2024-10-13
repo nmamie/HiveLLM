@@ -50,16 +50,17 @@ class EdgeWiseDistribution(ConnectDistribution):
         self.order_params = order_tensor
         # self.node_features = torch.randn(len(node_ids), 16, requires_grad=False)
         self.node_features = torch.randn(len(node_ids), node_feature_size, requires_grad=False)
-        self.gat = GATWithSentenceEmbedding(num_node_features=node_feature_size, hidden_channels=hidden_size, sentence_embedding_dim=node_feature_size, num_heads=8).to(self.device)
+        # self.gat = GATWithSentenceEmbedding(num_node_features=node_feature_size, hidden_channels=hidden_size, sentence_embedding_dim=node_feature_size, num_heads=8).to(self.device)
         # self.link_predictor = LinkPredictor(in_channels=16).to(self.device)
         # edge index
-        edges = self.potential_connections
-        # Unique nodes
-        nodes = list(set([node for edge in edges for node in edge]))
-        # Create a mapping from node labels to indices
-        node_to_index = {node: i for i, node in enumerate(nodes)}
-        # Convert the edges to index format
-        self.edge_index = torch.tensor([[node_to_index[edge[0]], node_to_index[edge[1]]] for edge in edges], dtype=torch.long, requires_grad=False).t()
+        # edges = self.potential_connections
+        # # Unique nodes
+        # nodes = list(set([node for edge in edges for node in edge]))
+        # # Create a mapping from node labels to indices
+        # node_to_index = {node: i for i, node in enumerate(nodes)}
+        # # Convert the edges to index format
+        # self.edge_index = torch.tensor([[node_to_index[edge[0]], node_to_index[edge[1]]] for edge in edges], dtype=torch.long, requires_grad=False).t()
+        self.edge_index = None
         
     def random_sample_num_edges(self, graph: CompositeGraph, num_edges: int) -> CompositeGraph:
         _graph = deepcopy(graph)

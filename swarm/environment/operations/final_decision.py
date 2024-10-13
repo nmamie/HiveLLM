@@ -111,6 +111,7 @@ class FinalDecision(Node):
 
         elif self.strategy == MergingStrategy.MajorityVote:
             if len(inputs) == 0:
+                # inputs = [{"output": "No answers provided.", "task": "No task provided.", "files": "No files provided."}]
                 raise Exception("No inputs is not supported for MajorityVote")
             answers = [input.get("output") for input in inputs]
             counter = Counter(answers)
