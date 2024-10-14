@@ -61,10 +61,10 @@ def parse_args():
     parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=1000)
 
     #ALGO SPECIFIC ARGS
-    parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=5) #10
-    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=2) #5
+    parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
+    parser.add_argument('--rollsize', type=int, help='#Policies in rollout size',  default=5) #5
     parser.add_argument('--gradperstep', type=float, help='#Gradient step per env step',  default=1.0)
-    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=2) #5
+    parser.add_argument('--num_test', type=int, help='#Test envs to average on',  default=5) #5
 
     # args = parser.parse_args()
     

@@ -61,7 +61,16 @@ class CategoricalGATPolicy(nn.Module):
         self.action_fc = nn.Linear(hidden_channels, 1)          
         
             
-    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
+    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, batch_size=1):
+        # ---- ADD POSITIONAL ENCODING AND BINARY STATE INDICATOR ----
+        # Apply binary state indicator for the new active node
+        state_indicator = torch.zeros(x.size(0), 1)
+        state_indicator[active_node_idx] = 1  # Mark active node
+        x += self.state_indicator_fc(state_indicator)  # Incorporate binary state indicator
+        
+        # Apply learnable positional encoding to the active node
+        x[active_node_idx] += self.positional_encoding.squeeze(0)
+        
         # Pass through the GAT layers
         x_res = x  # Save initial embeddings for residual connection
         
@@ -99,8 +108,8 @@ class CategoricalGATPolicy(nn.Module):
 
 
 
-    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
-        _, x, attention, logits = self.clean_action(x, edge_index, sentence, return_only_action=False, batch_size=batch_size)
+    def noisy_action(self, x: torch.Tensor, edge_index: int, active_node_idx: torch.Tensor, sentence: str, return_only_action=True, batch_size=1):
+        _, x, attention, logits = self.clean_action(x, edge_index, active_node_idx, sentence, return_only_action=False, batch_size=batch_size)
 
         dist = Categorical(logits=logits)
         action = dist.sample()

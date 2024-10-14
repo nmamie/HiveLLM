@@ -309,7 +309,7 @@ class Graph(ABC):
                 break
             tries += 1
             if tries == max_tries:
-                reward -= 50
+                reward -= 0
 
         # for successor in current_node.successors:
         #     if successor.id in useful_node_ids:
@@ -328,9 +328,9 @@ class Graph(ABC):
                 if final_answer_post == correct_answer:
                     reward += 100
                 else:
-                    reward -= 100
+                    reward -= 0
             else:
-                reward -= 100
+                reward -= 0
             
             # if len(output_messages) > 0 and not return_all_outputs:
             #     final_answer = output_messages[-1].get("output", output_messages[-1])

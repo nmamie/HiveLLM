@@ -45,15 +45,6 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         total_frame = 0
         state, edge_index, active_node_idx, records = env.reset()
         
-        # ---- ADD POSITIONAL ENCODING AND BINARY STATE INDICATOR ----        
-        # Apply binary state indicator for the active node
-        state_indicator = torch.zeros(state.size(0), 1)
-        state_indicator[active_node_idx] = 1  # Mark active node
-        state += net.state_indicator_fc(state_indicator)  # Incorporate binary state indicator
-
-        # Apply learnable positional encoding to the active node
-        state[active_node_idx] += net.positional_encoding.squeeze(0)
-        
         rollout_trajectory = []
         # state = utils.to_tensor(state)
         for record in records:
@@ -63,21 +54,12 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                            
                 # ---- CALL GAT NETWORK FOR ACTION SELECTION ----
                 if type == 'pg':
-                    action, next_state, attention, logits = net.noisy_action(state, edge_index, sentence, return_only_action=False)  # Choose an action from the policy network
+                    action, next_state, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence, return_only_action=False)  # Choose an action from the policy network
                 else:
-                    action, next_state, attention, logits = net.clean_action(state, edge_index, sentence, return_only_action=False)
+                    action, next_state, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence, return_only_action=False)
 
                 # Simulate one step in environment
                 next_state, active_node_idx, reward, done, info = env.step(action.flatten(), record, state, edge_index)
-                
-                # ---- ADD POSITIONAL ENCODING AND BINARY STATE INDICATOR ----
-                # Apply binary state indicator for the new active node
-                state_indicator = torch.zeros(next_state.size(0), 1)
-                state_indicator[active_node_idx] = 1  # Mark active node
-                next_state += net.state_indicator_fc(state_indicator)  # Incorporate binary state indicator
-                
-                # Apply learnable positional encoding to the active node
-                next_state[active_node_idx] += net.positional_encoding.squeeze(0)
                 
                 fitness += reward
 
@@ -85,7 +67,7 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                 if store_data:  # Skip for test set
                     rollout_trajectory.append([
                         utils.to_numpy(state), utils.to_numpy(next_state),
-                        np.float32(action), np.float32(np.array([reward])),
+                        np.float32(action), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])),
                         utils.to_numpy(edge_index), np.float32(np.array([float(done)]))
                     ])
                 

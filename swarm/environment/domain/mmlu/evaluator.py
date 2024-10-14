@@ -65,7 +65,7 @@ class Evaluator():
         
         self.args = args
 
-    def evaluate_direct_answer(self,
+    async def evaluate_direct_answer(self,
             limit_questions: Optional[int] = None,
             ) -> float:
 
@@ -86,7 +86,8 @@ class Evaluator():
             input_dict = dataset.record_to_swarm_input(record)
             print(input_dict)
 
-            raw_answer = io_agent.run(input_dict)
+            raw_answer = await io_agent.run(input_dict)
+            raw_answer = raw_answer[0]
 
             print("Raw answer:", raw_answer)
             answer = dataset.postprocess_answer(raw_answer)
@@ -105,7 +106,7 @@ class Evaluator():
         print("Done!")
         return accuracy.get()
 
-    def evaluate_swarm(
+    async def evaluate_swarm(
             self,
             mode: Union[
                 Literal['full_connected_swarm'],
@@ -273,39 +274,17 @@ class Evaluator():
         
         ################################## Find and Set MDP (environment constructor) ########################
         if self.args.train:
-            env_constructor = EnvConstructor(realized_graph, train_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
+            train_env_constructor = EnvConstructor(realized_graph, train_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
+            val_env_constructor = EnvConstructor(realized_graph, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
         else:
-            env_constructor = EnvConstructor(realized_graph, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
-
-        # try:
-        #     pickle.dumps(self._swarm)
-        #     print("Swarm is pickleable")
-        #     pickle.dumps(dataset)
-        #     print("Dataset is pickleable")
-        #     pickle.dumps(num_pot_edges)
-        #     print("num_pot_edges is pickleable")
-        #     pickle.dumps(num_nodes)
-        #     print("num_nodes is pickleable")
-        #     pickle.dumps(num_node_features)
-        #     print("num_node_features is pickleable")
-        #     pickle.dumps(self._swarm.connection_dist.node_features)
-        #     print("node_features is pickleable")
-        #     pickle.dumps(self._swarm.connection_dist.node_id2idx)
-        #     print("node_id2idx is pickleable")
-        #     pickle.dumps(self._swarm.connection_dist.node_idx2id)
-        #     print("node_idx2id is pickleable")
-        #     pickle.dumps(self._swarm.connection_dist.edge_index)
-        #     print("edge_index is pickleable")
-        #     pickle.dumps(batch_size)
-        #     print("All objects are pickleable")
-        # except Exception as e:
-        #     print(f"Cannot pickle object: {e}")
+            train_env_constructor = None
+            val_env_constructor = EnvConstructor(realized_graph, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
 
         #######################  Actor, Critic and ValueFunction Model Constructor ######################
-        model_constructor = ModelConstructor(env_constructor.state_dim, env_constructor.action_dim, self.args.hidden_size, potential_connections)
+        model_constructor = ModelConstructor(val_env_constructor.state_dim, val_env_constructor.action_dim, self.args.hidden_size, potential_connections)
         
         # train and evaluate AI
-        ai = ERL_Trainer(self.args, self._swarm, model_constructor, env_constructor, num_nodes, num_pot_edges)
+        ai = ERL_Trainer(self.args, self._art_dir_name, self._swarm, model_constructor, train_env_constructor, val_env_constructor, num_nodes, num_pot_edges)
         
         # training or evaluation
         if self.args.train:

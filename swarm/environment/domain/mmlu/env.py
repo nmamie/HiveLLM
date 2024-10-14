@@ -39,7 +39,10 @@ class GymWrapper:
             self.action_dim = self.num_nodes
         self.test_size = 10
 
-        self.loader = self._infinite_data_loader()
+        if self.train:
+            self.loader = self._infinite_data_loader()
+        else:
+            self.loader = self._eval_loader(batch_size=1, dataset=self.dataset, limit_questions=153)
 
         print("Env Initialized")
 

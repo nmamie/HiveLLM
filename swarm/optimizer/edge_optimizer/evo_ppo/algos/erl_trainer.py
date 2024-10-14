@@ -1,5 +1,6 @@
+import json
 import math
-from typing import Any, Iterator, List
+from typing import Any, Dict, Iterator, List
 import numpy as np, os, time, random, torch, sys
 
 from tqdm import tqdm
@@ -14,15 +15,17 @@ import torch
 
 class ERL_Trainer:
 
-	def __init__(self, args, swarm, model_constructor, env_constructor, num_nodes, num_edges):
+	def __init__(self, args, art_dir_name, swarm, model_constructor, train_env_constructor, val_env_constructor, num_nodes, num_edges):
 
 		self.args = args
-		self.policy_string = 'CategoricalPolicy' if env_constructor.is_discrete else 'Gaussian_FF'
+		self._art_dir_name = art_dir_name
+		self.policy_string = 'CategoricalPolicy' if val_env_constructor.is_discrete else 'Gaussian_FF'
 		self.manager = Manager()
 		self._swarm = swarm
 		self.num_nodes = num_nodes
 		self.num_edges = num_edges
-		self.env_constructor = env_constructor
+		self.train_env_constructor = train_env_constructor
+		self.val_env_constructor = val_env_constructor
 		self.device = torch.device(args.gpu_id if torch.cuda.is_available() else "cpu")
   
   		#Save best policy
@@ -38,7 +41,7 @@ class ERL_Trainer:
 				self.population.append(model_constructor.make_model(self.policy_string))
 
 			#PG Learner
-			if env_constructor.is_discrete:
+			if train_env_constructor.is_discrete:
 				from swarm.optimizer.edge_optimizer.evo_ppo.algos.ddqn import DDQN
 				self.learner = DDQN(args, model_constructor)
 			else:
@@ -57,14 +60,14 @@ class ERL_Trainer:
 			#Evolutionary population Rollout workers
 			self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
 			self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
-			self.evo_workers = [Process(target=rollout_worker, args=(id, 'evo', self.evo_task_pipes[id][1], self.evo_result_pipes[id][0], args.rollout_size > 0, self.population, env_constructor)) for id in range(args.pop_size)]
+			self.evo_workers = [Process(target=rollout_worker, args=(id, 'evo', self.evo_task_pipes[id][1], self.evo_result_pipes[id][0], args.rollout_size > 0, self.population, train_env_constructor)) for id in range(args.pop_size)]
 			for worker in self.evo_workers: worker.start()
 			self.evo_flag = [True for _ in range(args.pop_size)]
 
 			#Learner rollout workers
 			self.task_pipes = [Pipe() for _ in range(args.rollout_size)]
 			self.result_pipes = [Pipe() for _ in range(args.rollout_size)]
-			self.workers = [Process(target=rollout_worker, args=(id, 'pg', self.task_pipes[id][1], self.result_pipes[id][0], True, self.rollout_bucket, env_constructor)) for id in range(args.rollout_size)]
+			self.workers = [Process(target=rollout_worker, args=(id, 'pg', self.task_pipes[id][1], self.result_pipes[id][0], True, self.rollout_bucket, train_env_constructor)) for id in range(args.rollout_size)]
 			for worker in self.workers: worker.start()
 			self.roll_flag = [True for _ in range(args.rollout_size)]
 
@@ -75,7 +78,7 @@ class ERL_Trainer:
 			# Test workers
 			self.test_task_pipes = [Pipe() for _ in range(args.num_test)]
 			self.test_result_pipes = [Pipe() for _ in range(args.num_test)]
-			self.test_workers = [Process(target=rollout_worker, args=(id, 'test', self.test_task_pipes[id][1], self.test_result_pipes[id][0], False, self.test_bucket, env_constructor)) for id in range(args.num_test)]
+			self.test_workers = [Process(target=rollout_worker, args=(id, 'test', self.test_task_pipes[id][1], self.test_result_pipes[id][0], False, self.test_bucket, val_env_constructor)) for id in range(args.num_test)]
 			for worker in self.test_workers: worker.start()
 			self.test_flag = False
 
@@ -113,8 +116,8 @@ class ERL_Trainer:
 		############# UPDATE PARAMS USING GRADIENT DESCENT ##########
 		if self.replay_buffer.__len__() > self.args.learning_start: ###BURN IN PERIOD
 			for _ in range(int(self.gen_frames * self.args.gradperstep)):
-				s, ns, a, r, e, done = self.replay_buffer.sample(self.args.batch_size)
-				self.learner.update_parameters(s, ns, a, r, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
+				s, ns, a, r, n, e, done = self.replay_buffer.sample(self.args.batch_size)
+				self.learner.update_parameters(s, ns, a, r, n, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
 
 			self.gen_frames = 0
 
@@ -243,7 +246,7 @@ class ERL_Trainer:
 			self._swarm.connection_dist.node_features = model_state['init']
 		self.best_policy.to(self.device)
 		self.best_policy.eval()
-		env = self.env_constructor.make_env()
+		env = self.val_env_constructor.make_env()
 		accuracy = Accuracy()
   
 		progress_bar = tqdm(total=limit_questions)
@@ -285,6 +288,14 @@ class ERL_Trainer:
 			progress_bar.set_description(f"Accuracy: {accuracy.get():.2f}")
 			if progress_bar.n >= limit_questions:
 				break
+		print("Final accuracy:")
+		accuracy.print()
+
+		self._dump_eval_results(dict(
+			accuracy=accuracy.get(),
+			limit_questions=limit_questions))
+		
+		print("Done!")
 		return accuracy.get()
 
 	def _eval_loader(self, batch_size: int, dataset: List[Any], limit_questions: int = None) -> Iterator[List[Any]]:
@@ -300,6 +311,12 @@ class ERL_Trainer:
 		if len(records) > 0:
 			yield records
 		return
+
+	def _dump_eval_results(self, dct: Dict[str, Any]) -> None:
+		if self._art_dir_name is not None:
+			eval_json_name = os.path.join(self._art_dir_name, "evaluation.json")
+			with open(eval_json_name, "w") as f:
+				json.dump(dct, f)
 
 	def _print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False):
 		assert self._swarm is not None
