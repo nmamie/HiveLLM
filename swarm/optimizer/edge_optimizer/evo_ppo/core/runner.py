@@ -16,7 +16,6 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
     # edge_index = env.edge_index
 
     ###LOOP###
-    attention_history = []
     reward_history = {}
     action_history = {}
     while True:
@@ -26,21 +25,6 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         # Get the requisite network
         net = model_bucket[identifier]
         
-        # # realize graph
-        # edges = net.potential_connections
-        
-        # edge_logits = torch.zeros(
-        #     len(edges),
-        #     requires_grad=False)
-        # realized_graph, log_probs = env.swarm.connection_dist.realize_particle(env.swarm.composite_graph, edge_logits)
-        # env.env = realized_graph
-        # build edge_index
-        # # Unique nodes
-        # nodes = list(set([node for edge in edges for node in edge]))
-        # # Create a mapping from node labels to indices
-        # node_to_index = {node: i for i, node in enumerate(nodes)}
-        # # Convert the edges to index format
-        # edge_index = torch.tensor([[node_to_index[edge[0]], node_to_index[edge[1]]] for edge in edges], dtype=torch.long, requires_grad=False).t()
         fitness = 0.0
         total_frame = 0
         state, edge_index, active_node_idx, records = env.reset()
@@ -68,14 +52,15 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                     rollout_trajectory.append([
                         utils.to_numpy(state), utils.to_numpy(next_state),
                         np.float32(action), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])),
-                        utils.to_numpy(edge_index), np.float32(np.array([float(done)]))
+                        np.array([edge_index]), np.float32(np.array([float(done)]))
                     ])
                 
                 state = next_state
                 total_frame += 1
 
-                # Record the attention
-                attention_history.append(attention[1])
+                # # Display the attention and logits
+                # print(f"Attention {id}: ", attention)
+                # print(f"Logits {id}: ", logits)
 
                 # Record the rewards for each node
                 if action.item() not in reward_history:
@@ -100,13 +85,10 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         # package reward history and action history for return
         rewards_dist = {k: sum(v) / len(v) for k, v in reward_history.items()}
         action_dist = action_history
-        attention_dist = torch.mean(torch.stack(attention_history), dim=0)
         
         print(f"Averaged reward per node {id}: ", rewards_dist)
         print(f"Action distribution {id}: ", action_dist)
-        print(f"Averaged attention {id}: ", attention_dist)
-
         
         
         # Send back id, fitness, total length and shaped fitness using the result pipe
-        result_pipe.send([identifier, fitness, total_frame, rollout_trajectory, rewards_dist, action_dist, attention_dist])
+        result_pipe.send([identifier, fitness, total_frame, rollout_trajectory])

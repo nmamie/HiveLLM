@@ -326,11 +326,12 @@ class Graph(ABC):
                 final_answer_post = dataset.postprocess_answer(final_answer)
                 final_answers.append(final_answer)
                 if final_answer_post == correct_answer:
+                    # if self.num_steps <= self.num_nodes * 4:
                     reward += 100
-                else:
-                    reward -= 0
-            else:
-                reward -= 0
+            #     else:
+            #         reward -= 0
+            # else:
+            #     reward -= 0
             
             # if len(output_messages) > 0 and not return_all_outputs:
             #     final_answer = output_messages[-1].get("output", output_messages[-1])
@@ -354,14 +355,13 @@ class Graph(ABC):
             #     reward -= 100
                         
         else:
-            # # check answer of current node to get reward
-            # current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
-            # current_answer_post = dataset.postprocess_answer(current_answer)
-            # if current_answer_post == correct_answer:
-            #     reward -= 1
-            # else:
-            #     reward -= 10
-            reward -= 1
+            # check answer of current node to get reward
+            current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
+            current_answer_post = dataset.postprocess_answer(current_answer)
+            if current_answer_post == correct_answer:
+                reward -= 0
+            else:
+                reward -= 5
                 
         # step counter
         self.num_steps += 1

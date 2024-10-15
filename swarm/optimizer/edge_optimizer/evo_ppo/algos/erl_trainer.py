@@ -126,7 +126,7 @@ class ERL_Trainer:
 		all_fitness = []; all_eplens = []
 		if self.args.pop_size > 1:
 			for i in range(self.args.pop_size):
-				_, fitness, frames, trajectory, rewards_dist, action_dist, attention_dist = self.evo_result_pipes[i][1].recv()
+				_, fitness, frames, trajectory = self.evo_result_pipes[i][1].recv()
 
 				all_fitness.append(fitness); all_eplens.append(frames)
 				self.gen_frames+= frames; self.total_frames += frames
@@ -138,7 +138,7 @@ class ERL_Trainer:
 		rollout_fitness = []; rollout_eplens = []
 		if self.args.rollout_size > 0:
 			for i in range(self.args.rollout_size):
-				_, fitness, pg_frames, trajectory, rewards_dist, action_dist, attention_dist = self.result_pipes[i][1].recv()
+				_, fitness, pg_frames, trajectory = self.result_pipes[i][1].recv()
 				self.replay_buffer.add(trajectory)
 				self.gen_frames += pg_frames; self.total_frames += pg_frames
 				self.best_score = max(self.best_score, fitness)
@@ -163,7 +163,7 @@ class ERL_Trainer:
 			self.test_flag = False
 			test_scores = []
 			for pipe in self.test_result_pipes: #Collect all results
-				_, fitness, _, _, _, _, _ = pipe[1].recv()
+				_, fitness, _, _ = pipe[1].recv()
 				self.best_score = max(self.best_score, fitness)
 				gen_max = max(gen_max, fitness)
 				test_scores.append(fitness)
@@ -254,28 +254,15 @@ class ERL_Trainer:
 		while True:
 			print(80*'-')
 			state, edge_index, active_node_idx, records = await env.val_reset()
-			state = state.to(self.device)
-			# Apply binary state indicator for the active node
-			state_indicator = torch.zeros(state.size(0), 1)
-			state_indicator[active_node_idx] = 1  # Mark active node
-			state_indicator = state_indicator.to(self.device)
-			state += self.best_policy.state_indicator_fc(state_indicator)  # Incorporate binary state indicator
-			# Apply learnable positional encoding to the active node
-			state[active_node_idx] += self.best_policy.positional_encoding.squeeze(0)
 			record = records[0][0]
+			sentence = record
+			print("Question:", sentence)
 			done = False
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
-				action = self.best_policy.clean_action(state, edge_index, active_node_idx)
+				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence)
 				state, active_node_idx, reward, done, final_answers = await env.val_step(action, record, state, edge_index)
-				# Apply binary state indicator for the active node
-				state_indicator = torch.zeros(state.size(0), 1)
-				state_indicator[active_node_idx] = 1  # Mark active node
-				state_indicator = state_indicator.to(self.device)
-				state += self.best_policy.state_indicator_fc(state_indicator)  # Incorporate binary state indicator
-				# Apply learnable positional encoding to the active node
-				state[active_node_idx] += self.best_policy.positional_encoding.squeeze(0)
 			raw_answer = final_answers[0]
 			print("Raw answer:", raw_answer)
 			answer = val_dataset.postprocess_answer(raw_answer)
@@ -297,20 +284,6 @@ class ERL_Trainer:
 		
 		print("Done!")
 		return accuracy.get()
-
-	def _eval_loader(self, batch_size: int, dataset: List[Any], limit_questions: int = None) -> Iterator[List[Any]]:
-		records = []
-		for i_record, record in enumerate(dataset):
-			if limit_questions is not None:
-				if i_record >= limit_questions:
-					break
-			records.append(record)
-			if len(records) >= batch_size:
-				yield records
-				records = []
-		if len(records) > 0:
-			yield records
-		return
 
 	def _dump_eval_results(self, dct: Dict[str, Any]) -> None:
 		if self._art_dir_name is not None:

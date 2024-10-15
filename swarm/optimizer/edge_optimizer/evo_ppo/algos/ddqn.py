@@ -28,10 +28,9 @@ class DDQN(object):
         self.num_updates = 0
 
     def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, active_node_batch, edge_index_batch, done_batch, batch_size, node_feature_size, num_nodes, num_edges):
-        
         state_batch = torch.reshape(state_batch, (batch_size, num_nodes, node_feature_size))
         next_state_batch = torch.reshape(next_state_batch, (batch_size, num_nodes, node_feature_size))
-        edge_index_batch = torch.reshape(edge_index_batch, (batch_size, 2, num_edges))
+        # edge_index_batch = torch.reshape(edge_index_batch, (batch_size, 2, num_edges))
         
         state_batch = state_batch.to(self.device)
         next_state_batch=next_state_batch.to(self.device)
@@ -58,7 +57,7 @@ class DDQN(object):
 
             # Batch the graphs
             batch = Batch.from_data_list(data_list)
-                        
+                                    
             na = self.actor.clean_action(batch.x, batch.edge_index, batch.active_node, "", return_only_action=True, batch_size=batch_size)
             _, _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, batch.active_node, "", return_only_action=False, batch_size=batch_size)
             next_entropy = -(F.softmax(ns_logits, dim=1) * F.log_softmax(ns_logits, dim=1)).mean(1).unsqueeze(1)
