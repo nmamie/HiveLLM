@@ -50,6 +50,7 @@ class EdgeWiseDistribution(ConnectDistribution):
         self.order_params = order_tensor
         # self.node_features = torch.randn(len(node_ids), 16, requires_grad=False)
         self.node_features = torch.randn(len(node_ids), node_feature_size, requires_grad=False)
+        self.state_indicator = torch.randn(1, node_feature_size, requires_grad=False)
         # self.gat = GATWithSentenceEmbedding(num_node_features=node_feature_size, hidden_channels=hidden_size, sentence_embedding_dim=node_feature_size, num_heads=8).to(self.device)
         # self.link_predictor = LinkPredictor(in_channels=16).to(self.device)
         # edge index

@@ -18,6 +18,7 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
     ###LOOP###
     reward_history = {}
     action_history = {}
+    pruned_nodes = []
     while True:
         identifier = task_pipe.recv()  # Wait until a signal is received  to start rollout
         if identifier == 'TERMINATE': exit(0) #Exit
@@ -35,12 +36,14 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
             done = False
             while True:  # unless done    
                 sentence = record['question']
+                
+                # state[active_node_idx] += net.state_indicator_fc(state[active_node_idx])
                            
                 # ---- CALL GAT NETWORK FOR ACTION SELECTION ----
                 if type == 'pg':
-                    action, next_state, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence, return_only_action=False)  # Choose an action from the policy network
+                    action, state, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence, return_only_action=False, pruned_nodes=pruned_nodes)  # Choose an action from the policy network
                 else:
-                    action, next_state, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence, return_only_action=False)
+                    action, state, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence, return_only_action=False, pruned_nodes=pruned_nodes)
 
                 # Simulate one step in environment
                 next_state, active_node_idx, reward, done, info = env.step(action.flatten(), record, state, edge_index)
@@ -50,7 +53,7 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                 # ---- STORE TRANSITIONS IF NEEDED ----
                 if store_data:  # Skip for test set
                     rollout_trajectory.append([
-                        utils.to_numpy(state), utils.to_numpy(next_state),
+                        np.array([state]), np.array([next_state]),
                         np.float32(action), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])),
                         np.array([edge_index]), np.float32(np.array([float(done)]))
                     ])
@@ -89,6 +92,12 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         print(f"Averaged reward per node {id}: ", rewards_dist)
         print(f"Action distribution {id}: ", action_dist)
         
+        # nodes that do not perform well should be pruned
+        for node in rewards_dist:
+            if rewards_dist[node] < -3.0 and action_dist[node] > 50: # adjust this threshold
+                if node not in pruned_nodes and len(pruned_nodes) < len(rewards_dist) - 1:
+                    pruned_nodes.append(node)
+        print(f"Pruned nodes {id}: ", pruned_nodes)
         
         # Send back id, fitness, total length and shaped fitness using the result pipe
         result_pipe.send([identifier, fitness, total_frame, rollout_trajectory])

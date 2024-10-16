@@ -60,6 +60,7 @@ class Graph(ABC):
         self.input_nodes: List[Node] = []
         self.output_nodes: List[Node] = []
         self.state = None
+        self.current_node_id = None
         self.num_steps = 0
         self.build_graph()
 
@@ -205,16 +206,10 @@ class Graph(ABC):
         self.useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
         in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in self.useful_node_ids}
         zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in self.useful_node_ids]
+        potential_start_nodes = [node_id for node_id in self.useful_node_ids if len(self.nodes[node_id].successors) > 0]
         
         current_node_id = zero_in_degree_queue.pop(0)
         
-        # create edge index from current node
-        # edge_index = []
-        # for node in self.nodes.values():
-        #     for successor in node.successors:
-        #         if successor.id in self.useful_node_ids:
-        #             edge_index.append([node2idx[node.id], node2idx[successor.id]])
-        # edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         edge_index = []
         current_node = self.nodes[current_node_id]
         for successor in current_node.successors:
@@ -222,16 +217,14 @@ class Graph(ABC):
                 edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
         edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
         
-        # filter node_features based on edge_index
-        # active_nodes_mask = torch.zeros(node_features.shape[0], dtype=torch.bool)
-        # for node_id in range(node_features.shape[0]):
-        #     if node_id in edge_index[0] or node_id in edge_index[1]:
-        #         active_nodes_mask[node_id] = True
-        
+        current_node_id = np.random.choice(potential_start_nodes)
+        current_node = self.nodes[current_node_id]
+                
         self.state = node_features
+        self.current_node_id = current_node_id
         self.num_steps = 0
         
-        return self.state, edge_index, current_node_id
+        return self.state, edge_index, self.current_node_id
     
     
     async def step(self, dataset: List[Dict[str, Any]],
@@ -264,8 +257,10 @@ class Graph(ABC):
             input_node.inputs = [node_input]
         
         final_answers = []
-        next_state = state
-        self.state = next_state
+        
+        # add state diff to node features
+        next_state = self.state
+        self.current_node_id = current_node_id
         
         # # policy step
         # edge_index = []

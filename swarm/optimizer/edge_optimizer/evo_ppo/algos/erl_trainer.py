@@ -177,7 +177,8 @@ class ERL_Trainer:
 				utils.hard_update(self.best_policy, self.test_bucket[0])
 				torch.save({
 					'policy': self.best_policy.state_dict(), 
-					'init': self._swarm.connection_dist.node_features
+					'init': self._swarm.connection_dist.node_features,
+					'state': self._swarm.connection_dist.state_indicator
 				}, self.args.aux_folder + '_best'+self.args.savetag)
 				logger.info('Best policy saved with score:%.2f' % self.test_score)
 
@@ -244,6 +245,7 @@ class ERL_Trainer:
 			model_state = torch.load(self.args.aux_folder + '_best'+self.args.savetag)
 			self.best_policy.load_state_dict(model_state['policy'])
 			self._swarm.connection_dist.node_features = model_state['init']
+			self._swarm.connection_dist.state_indicator = model_state['state']
 		self.best_policy.to(self.device)
 		self.best_policy.eval()
 		env = self.val_env_constructor.make_env()

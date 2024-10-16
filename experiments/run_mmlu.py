@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='Seed', default=991)
     parser.add_argument('--savetag', type=str, help='#Tag to append to savefile',  default='')
     parser.add_argument('--gpu_id', type=int, help='#GPU ID ',  default=0)
-    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.1)
+    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.05)
     parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.01)
     # parser.add_argument('--frameskip', type=int, help='Frameskip',  default=1)
 

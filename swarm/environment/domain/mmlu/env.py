@@ -13,7 +13,7 @@ class GymWrapper:
 
     """
 
-    def __init__(self, swarm, dataset, train, num_pot_edges, num_nodes, num_node_features, node_features, node2idx, idx2node, edge_index, batch_size, num_envs):
+    def __init__(self, swarm, dataset, train, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs):
         """
         A base template for all environment wrappers.
         """
@@ -28,6 +28,7 @@ class GymWrapper:
         self.batch_size = batch_size
         self.current_node_id = None
         self.node_features = node_features
+        self.state_indicator = state_indicator
         self.node2idx = node2idx
         self.idx2node = idx2node
         self.edge_index = edge_index
@@ -76,10 +77,11 @@ class GymWrapper:
                 next_obs (list): Next state
         """
         state, self.edge_index, self.current_node_id = asyncio.run(self.env.reset(self.node_features, self.node2idx))
-        self.node_features = state
         records = []
         for i, record in zip(range(self.num_envs), self.loader):
             records.append(record)
+            
+        state[self.node2idx[self.current_node_id]] = state[self.node2idx[self.current_node_id]] + self.state_indicator
             
         return state, self.edge_index, self.node2idx[self.current_node_id], records
         
@@ -106,10 +108,7 @@ class GymWrapper:
         terminate = False
         current_node_id = self.idx2node[action.item()]
         next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, state, edge_index, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
-        # for i, record in zip(range(self.batch_size), self.loader): # TODO: same record needs to propagate through the computation graph
-        #     next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
-        #     rewards += reward
-        #     if terminate: break       
+        next_state[self.node2idx[self.current_node_id]] = next_state[self.node2idx[self.current_node_id]] + self.state_indicator
                     
         # next_state = np.expand_dims(next_state, axis=0)
         return next_state, self.node2idx[self.current_node_id], reward, terminate, final_answers
@@ -128,7 +127,7 @@ class GymWrapper:
             self.train = False
             self.loader = self._eval_loader(batch_size=1, dataset=self.dataset, limit_questions=153)
         state, self.edge_index, self.current_node_id = await self.env.reset(self.node_features, self.node2idx)
-        self.node_features = state
+        state[self.node2idx[self.current_node_id]] = state[self.node2idx[self.current_node_id]] + self.state_indicator
         records = []
         record = next(self.loader)
         records.append(record)   
@@ -159,10 +158,7 @@ class GymWrapper:
         current_node_id = self.idx2node[action.item()]
             
         next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = await self.env.step(self.dataset, record, state, edge_index, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action)
-        # for i, record in zip(range(self.batch_size), self.loader): # TODO: same record needs to propagate through the computation graph
-        #     next_state, reward, terminate, final_answers, self.current_node_id, self.edge_index = asyncio.run(self.env.step(self.dataset, record, current_node_id=current_node_id, node_features=self.node_features, node2idx=self.node2idx, action=action))
-        #     rewards += reward
-        #     if terminate: break       
+        next_state[self.node2idx[self.current_node_id]] = next_state[self.node2idx[self.current_node_id]] + self.state_indicator    
                     
         # next_state = np.expand_dims(next_state, axis=0)
         return next_state, self.node2idx[self.current_node_id], reward, terminate, final_answers

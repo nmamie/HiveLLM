@@ -43,54 +43,62 @@ class CategoricalGATPolicy(nn.Module):
         self.conv1 = GATConv(num_node_features, hidden_channels,
                             heads=num_heads, dropout=0.6)
         self.conv2 = GATConv(hidden_channels * num_heads,
-                            hidden_channels, dropout=0.6, heads=1, concat=False)
+                            num_node_features, dropout=0.6, heads=1, concat=False)
 
-        self.positional_encoding = nn.Parameter(
-            torch.randn(1, num_node_features), requires_grad=True)
+        # self.positional_encoding = nn.Parameter(
+        #     torch.randn(1, num_node_features), requires_grad=True)
 
-        # Adjust for concatenated state indicator
-        self.state_indicator_fc = nn.Linear(
-            num_node_features + 1, num_node_features)
+        # # Adjust for concatenated state indicator
+        # self.state_indicator_fc = nn.Linear(
+        #     num_node_features, num_node_features)
 
         # Action head for predicting next action/node
-        self.action_fc = nn.Linear(hidden_channels, 1)
+        self.action_fc = nn.Linear(num_node_features, 1)
 
-        # Normalization layer for embedding (optional)
-        self.norm_layer = nn.LayerNorm(hidden_channels)  # Or use nn.BatchNorm1d
+        # # Normalization layer for embedding (optional)
+        # self.norm_layer = nn.LayerNorm(hidden_channels)  # Or use nn.BatchNorm1d
 
 
-    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, batch_size=1):
+    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, pruned_nodes=[], batch_size=1):
         # Binary state indicator for the active node
-        state_indicator = torch.zeros(x.size(0), 1).to(x.device)
-        state_indicator[active_node_idx] = 1
-        x = torch.cat([x, state_indicator], dim=1)  # Concatenate binary indicator
+        # state_indicator = torch.zeros(x.size(0), 1).to(x.device)
+        # state_indicator[active_node_idx] = 1
+        # state_indicator = self.state_indicator_fc(state_indicator)
+        # x[active_node_idx] += self.state_indicator_fc(x[active_node_idx])
 
-        x = self.state_indicator_fc(x)  # Apply state indicator linear layer
-
-        # Apply learnable positional encoding (broadcast to all, enhance active node)
-        x += self.positional_encoding
-        # Enhance active node
-        x[active_node_idx] += self.positional_encoding.squeeze(0)
+        # # Apply learnable positional encoding (broadcast to all, enhance active node)
+        # x += self.positional_encoding
+        # # Enhance active node
+        # x[active_node_idx] += self.positional_encoding.squeeze(0)
 
         # Pass through GAT layers
-        x_res = x
+        # x_res = x
         x = self.conv1(x, edge_index)
         x = F.elu(x)
-        # Match dimensions for residual connection
-        x_res = self.proj_residual(x_res, x.size(1))
-        x = x + x_res
+        # # Match dimensions for residual connection
+        # x_res = self.proj_residual(x_res, x.size(1))
+        # x = x + x_res
 
-        x_res = x
+        # x_res = x
         x, attention = self.conv2(
             x, edge_index, return_attention_weights=True)
-        x_res = self.proj_residual(x_res, x.size(1))
-        x = x + x_res
+        # x_res = self.proj_residual(x_res, x.size(1))
+        # x = x + x_res
 
-        # Optional normalization
-        x = self.norm_layer(x)
-
+        # # Optional normalization
+        # x = self.norm_layer(x)
+        
         # Predict action logits
         action_logits = self.action_fc(x).view(batch_size, -1)
+        
+        # set logits of pruned nodes to very low value
+        for node in pruned_nodes:
+            action_logits[:, node] = -1e9
+        
+        # # softmax
+        # action_logits = F.softmax(action_logits, dim=1)
+        
+        # print("Action logits:", action_logits)
 
         # Apply argmax on the correct dimension
         action = action_logits.argmax(dim=1)
@@ -100,9 +108,9 @@ class CategoricalGATPolicy(nn.Module):
 
         return action, x, attention, action_logits
 
-    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, batch_size=1):
+    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, pruned_nodes=[], batch_size=1):
         _, x, attention, logits = self.clean_action(
-            x, edge_index, active_node_idx, sentence, return_only_action=False, batch_size=batch_size)
+            x, edge_index, active_node_idx, sentence, return_only_action=False, pruned_nodes=[], batch_size=batch_size)
 
         dist = Categorical(logits=logits)
         action = dist.sample()
@@ -113,12 +121,12 @@ class CategoricalGATPolicy(nn.Module):
 
         return action, x, attention, logits
 
-    def proj_residual(self, x_res, target_dim):
-        """Projects the residual connection to match the target dimension."""
-        if x_res.size(1) != target_dim:
-            x_res = nn.Linear(x_res.size(1), target_dim,
-                              bias=False).to(x_res.device)(x_res)
-        return x_res
+    # def proj_residual(self, x_res, target_dim):
+    #     """Projects the residual connection to match the target dimension."""
+    #     if x_res.size(1) != target_dim:
+    #         x_res = nn.Linear(x_res.size(1), target_dim,
+    #                           bias=False).to(x_res.device)(x_res)
+    #     return x_res
 
 
 class CategoricalPolicy(nn.Module):
