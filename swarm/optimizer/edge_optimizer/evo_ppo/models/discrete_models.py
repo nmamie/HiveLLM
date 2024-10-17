@@ -12,15 +12,14 @@ from swarm.optimizer.edge_optimizer.graph_net.layers import GraphAttentionLayer
 from transformers import BertModel, BertTokenizer
 
 
-# # Load pre-trained BERT model and tokenizer
-# # Using a distilled BERT model (smaller and faster with fewer parameters)
-# bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda') # type: ignore
-# tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
+# Load pre-trained BERT model and tokenizer
+# Using a distilled BERT model (smaller and faster with fewer parameters)
+bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda')
+tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
 
-# # Freeze BERT model parameters
-# for param in bert.parameters():
-#     param.requires_grad = False
-
+# Freeze BERT model parameters
+for param in bert.parameters():
+    param.requires_grad = False
 
 class CategoricalGATPolicy(nn.Module):
 
@@ -43,7 +42,7 @@ class CategoricalGATPolicy(nn.Module):
         self.conv1 = GATConv(num_node_features, hidden_channels,
                             heads=num_heads, dropout=0.6)
         self.conv2 = GATConv(hidden_channels * num_heads,
-                            num_node_features, dropout=0.6, heads=1, concat=False)
+                            hidden_channels, dropout=0.6, heads=1, concat=False)
 
         # self.positional_encoding = nn.Parameter(
         #     torch.randn(1, num_node_features), requires_grad=True)
@@ -51,25 +50,31 @@ class CategoricalGATPolicy(nn.Module):
         # # Adjust for concatenated state indicator
         # self.state_indicator_fc = nn.Linear(
         #     num_node_features, num_node_features)
+        
+        self.fc0 = nn.Linear(1, hidden_channels)
+        self.fc1 = nn.Linear(768, hidden_channels) # 768 is the size of BERT embeddings
 
         # Action head for predicting next action/node
-        self.action_fc = nn.Linear(num_node_features, 1)
-
+        self.action_fc = nn.Linear(hidden_channels, action_dim)
+        
         # # Normalization layer for embedding (optional)
         # self.norm_layer = nn.LayerNorm(hidden_channels)  # Or use nn.BatchNorm1d
 
 
-    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, pruned_nodes=[], batch_size=1):
-        # Binary state indicator for the active node
-        # state_indicator = torch.zeros(x.size(0), 1).to(x.device)
-        # state_indicator[active_node_idx] = 1
-        # state_indicator = self.state_indicator_fc(state_indicator)
-        # x[active_node_idx] += self.state_indicator_fc(x[active_node_idx])
-
-        # # Apply learnable positional encoding (broadcast to all, enhance active node)
-        # x += self.positional_encoding
-        # # Enhance active node
-        # x[active_node_idx] += self.positional_encoding.squeeze(0)
+    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step=0, pruned_nodes=[], batch_size=1):
+        
+        # Encode sentence with BERT
+        inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to('cuda')
+        with torch.no_grad():
+            sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
+            sentence_embedding = sentence_embedding.to(x.device)
+            steps = step + 1
+            if batch_size == 1:
+                steps = torch.tensor([steps], dtype=torch.float32).to(x.device)
+            steps = steps.unsqueeze(1)
+            steps = self.fc0(steps * 1e-2)
+            sentence_embedding = self.fc1(sentence_embedding)
+            sentence_embedding = sentence_embedding + steps
 
         # Pass through GAT layers
         # x_res = x
@@ -89,16 +94,32 @@ class CategoricalGATPolicy(nn.Module):
         # x = self.norm_layer(x)
         
         # Predict action logits
-        action_logits = self.action_fc(x).view(batch_size, -1)
+        active_node_features = x[active_node_idx].unsqueeze(0)
+                
+        # unsqueeze sentence embedding if not same dimension as active node features
+        if sentence_embedding.dim() != active_node_features.dim():
+            # sentence_embedding = sentence_embedding.repeat(batch_size, 1)
+            sentence_embedding = sentence_embedding.unsqueeze(0)
+        
+        active_node_features = active_node_features + sentence_embedding
+        
+        # if batch_size > 1:   
+        #     active_node_features = torch.cat((active_node_features, sentence_embedding), dim=2)
+        # else:
+        #     active_node_features = torch.cat((active_node_features, sentence_embedding), dim=1)
+            
+        # active_node_features = active_node_features + (step + 1) * 1e-3 # Add step as positional encoding
+        # active_node_features = self.fc0(active_node_features)
+        
+        action_logits = self.action_fc(active_node_features)       
+        
+        # check dimension of action logits
+        if action_logits.size(1) != self.action_dim:
+            action_logits = action_logits.squeeze(0)
         
         # set logits of pruned nodes to very low value
         for node in pruned_nodes:
             action_logits[:, node] = -1e9
-        
-        # # softmax
-        # action_logits = F.softmax(action_logits, dim=1)
-        
-        # print("Action logits:", action_logits)
 
         # Apply argmax on the correct dimension
         action = action_logits.argmax(dim=1)
@@ -108,9 +129,9 @@ class CategoricalGATPolicy(nn.Module):
 
         return action, x, attention, action_logits
 
-    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, pruned_nodes=[], batch_size=1):
+    def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step: int=0, pruned_nodes=[], batch_size=1):
         _, x, attention, logits = self.clean_action(
-            x, edge_index, active_node_idx, sentence, return_only_action=False, pruned_nodes=[], batch_size=batch_size)
+            x, edge_index, active_node_idx, sentence, return_only_action=False, step=step, pruned_nodes=[], batch_size=batch_size)
 
         dist = Categorical(logits=logits)
         action = dist.sample()

@@ -44,8 +44,8 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='Seed', default=991)
     parser.add_argument('--savetag', type=str, help='#Tag to append to savefile',  default='')
     parser.add_argument('--gpu_id', type=int, help='#GPU ID ',  default=0)
-    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.05)
-    parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.01)
+    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.02)
+    parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.005)
     # parser.add_argument('--frameskip', type=int, help='Frameskip',  default=1)
 
     parser.add_argument('--node_feature_size', type=int, help='#Node Feature size',  default=128)
@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('--batchsize', type=int, help='Batch size',  default=128) #64
     parser.add_argument('--num_envs', type=int, help='Number of environments to average on',  default=4)
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=5000)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=2000)
 
     #ALGO SPECIFIC ARGS
     parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10

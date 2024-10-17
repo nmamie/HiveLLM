@@ -1,6 +1,7 @@
 import json
 import math
 from typing import Any, Dict, Iterator, List
+from matplotlib.pyplot import step
 import numpy as np, os, time, random, torch, sys
 
 from tqdm import tqdm
@@ -116,8 +117,8 @@ class ERL_Trainer:
 		############# UPDATE PARAMS USING GRADIENT DESCENT ##########
 		if self.replay_buffer.__len__() > self.args.learning_start: ###BURN IN PERIOD
 			for _ in range(int(self.gen_frames * self.args.gradperstep)):
-				s, ns, a, r, n, e, done = self.replay_buffer.sample(self.args.batch_size)
-				self.learner.update_parameters(s, ns, a, r, n, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
+				s, ns, a, r, n, t, e, done = self.replay_buffer.sample(self.args.batch_size)
+				self.learner.update_parameters(s, ns, a, r, n, t, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
 
 			self.gen_frames = 0
 
@@ -252,7 +253,6 @@ class ERL_Trainer:
 		accuracy = Accuracy()
   
 		progress_bar = tqdm(total=limit_questions)
-  
 		while True:
 			print(80*'-')
 			state, edge_index, active_node_idx, records = await env.val_reset()
@@ -260,11 +260,13 @@ class ERL_Trainer:
 			sentence = record
 			print("Question:", sentence)
 			done = False
+			steps = 0
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
-				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence)
+				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence, step=steps)
 				state, active_node_idx, reward, done, final_answers = await env.val_step(action, record, state, edge_index)
+				steps += 1
 			raw_answer = final_answers[0]
 			print("Raw answer:", raw_answer)
 			answer = val_dataset.postprocess_answer(raw_answer)
