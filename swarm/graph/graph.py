@@ -61,6 +61,8 @@ class Graph(ABC):
         self.output_nodes: List[Node] = []
         self.state = None
         self.current_node_id = None
+        self.start_node_id = None
+        self.pruned_nodes = []
         self.num_steps = 0
         self.build_graph()
 
@@ -189,11 +191,13 @@ class Graph(ABC):
         else:
             if len(final_answers) == 0:
                 final_answers.append("No answer since there are no inputs provided")
-            return final_answers        
-        
+            return final_answers    
+    
     async def reset(self,
                     node_features: torch.Tensor,
+                    pruned_nodes: List[int],
                     node2idx: Dict[str, int]) -> Tuple[torch.Tensor, torch.Tensor, str]:
+        
         def is_node_useful(node):
             if node in self.output_nodes:
                 return True
@@ -203,28 +207,25 @@ class Graph(ABC):
                     return True
             return False
         
-        self.useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
-        in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in self.useful_node_ids}
-        zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in self.useful_node_ids]
-        potential_start_nodes = [node_id for node_id in self.useful_node_ids if len(self.nodes[node_id].successors) > 0]
+        self.pruned_nodes = pruned_nodes
         
-        current_node_id = zero_in_degree_queue.pop(0)
+        useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
+        in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in useful_node_ids}
+        # out_degree = {node_id: len(self.nodes[node_id].successors) for node_id in self.useful_node_ids}
+        zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
+        potential_start_nodes = [node_id for node_id in useful_node_ids if self.nodes[node_id].successors and node2idx[node_id] not in self.pruned_nodes]
         
-        edge_index = []
-        current_node = self.nodes[current_node_id]
-        for successor in current_node.successors:
-            if successor.id in self.useful_node_ids:
-                edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        self.start_node_id = np.random.choice(potential_start_nodes)
         
-        current_node_id = np.random.choice(potential_start_nodes)
-        current_node = self.nodes[current_node_id]
+        current_node_id = self.start_node_id
+        
+        # current_node = self.nodes[current_node_id]
                 
         self.state = node_features
         self.current_node_id = current_node_id
         self.num_steps = 0
-        
-        return self.state, edge_index, self.current_node_id
+                
+        return self.state, current_node_id
     
     
     async def step(self, dataset: List[Dict[str, Any]],
@@ -258,9 +259,32 @@ class Graph(ABC):
         
         final_answers = []
         
+        # reward
+        reward = 0
+        
+        # for first step
+        if self.num_steps == 0:
+            current_node = self.nodes[self.start_node_id]
+            tries = 0
+            while tries < max_tries:
+                try:
+                    await asyncio.wait_for(current_node.execute(), timeout=max_time)
+                    break
+                except asyncio.TimeoutError:
+                    print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
+                    # reward -= 100
+                except Exception as e:
+                    print(f"Error during execution of node {current_node_id}: {e}")
+                    # reward -= 100
+                    break
+                tries += 1
+        
         # add state diff to node features
         next_state = self.state
         self.current_node_id = current_node_id
+        
+        # step counter
+        self.num_steps += 1
         
         # # policy step
         # edge_index = []
@@ -286,9 +310,6 @@ class Graph(ABC):
         #             current_node_id = successor.id # action is to move to the node with highest attention
         # action = torch.tensor([node2idx[current_node_id]], dtype=torch.long)
         # next_state = node_features[node2idx[current_node_id]]
-        
-        # reward
-        reward = 0
         
         tries = 0
         while tries < max_tries:
@@ -357,15 +378,27 @@ class Graph(ABC):
                 reward -= 0
             else:
                 reward -= 5
-                
-        # step counter
-        self.num_steps += 1
+            
+            # --- TRUNCATE EPISODE ---
+            if self.num_steps > self.num_nodes * 2: #TODO: adapt the threshold
+                terminate = True # truncate episode
         
         # if self.num_steps % (self.num_nodes * 4) == 0:
         #     reward -= 20
         
         if len(final_answers) == 0:
             final_answers.append("No answer since there are no inputs provided")
+            
+        if terminate:
+            self.num_steps = 0
+            # reset all nodes
+            for node in self.nodes.values():
+                if len(node.inputs) > 0:
+                    node.inputs = []
+                if len(node.outputs) > 0:
+                    node.outputs = []
+            # reset to start node
+            current_node_id = self.start_node_id
             
         return next_state, reward, terminate, final_answers, current_node_id, edge_index
             

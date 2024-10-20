@@ -30,7 +30,7 @@ class CategoricalGATPolicy(nn.Module):
 
     """
 
-    def __init__(self, num_node_features, action_dim, hidden_channels, potential_connections, num_heads=8):
+    def __init__(self, num_node_features, action_dim, hidden_channels, potential_connections, num_heads=4):
         super(CategoricalGATPolicy, self).__init__()
 
         self.num_node_features = num_node_features
@@ -40,9 +40,9 @@ class CategoricalGATPolicy(nn.Module):
         self.potential_connections = potential_connections
 
         self.conv1 = GATConv(num_node_features, hidden_channels,
-                            heads=num_heads, dropout=0.6)
+                            heads=num_heads, dropout=0.6, residual=True)
         self.conv2 = GATConv(hidden_channels * num_heads,
-                            hidden_channels, dropout=0.6, heads=1, concat=False)
+                            hidden_channels, dropout=0.6, heads=1, concat=False, residual=True)
 
         # self.positional_encoding = nn.Parameter(
         #     torch.randn(1, num_node_features), requires_grad=True)
@@ -57,8 +57,9 @@ class CategoricalGATPolicy(nn.Module):
         # Action head for predicting next action/node
         self.action_fc = nn.Linear(hidden_channels, action_dim)
         
-        # # Normalization layer for embedding (optional)
-        # self.norm_layer = nn.LayerNorm(hidden_channels)  # Or use nn.BatchNorm1d
+        # Normalization layer for embedding (optional)
+        self.norm_layer1 = nn.LayerNorm(hidden_channels * num_heads)
+        self.norm_layer2 = nn.LayerNorm(hidden_channels)
 
 
     def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step=0, pruned_nodes=[], batch_size=1):
@@ -68,18 +69,22 @@ class CategoricalGATPolicy(nn.Module):
         with torch.no_grad():
             sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
             sentence_embedding = sentence_embedding.to(x.device)
-            steps = step + 1
-            if batch_size == 1:
-                steps = torch.tensor([steps], dtype=torch.float32).to(x.device)
-            steps = steps.unsqueeze(1)
-            steps = self.fc0(steps * 1e-2)
-            sentence_embedding = self.fc1(sentence_embedding)
-            sentence_embedding = sentence_embedding + steps
+        
+        # merge different state embeddings to a single sentence embedding
+        steps = step + 1
+        if batch_size == 1:
+            steps = torch.tensor([steps], dtype=torch.float32).to(x.device)
+        steps = steps.unsqueeze(1)
+        steps = self.fc0(steps * 1e-2)  # Scale down step to avoid exploding gradients
+        sentence_embedding = self.fc1(sentence_embedding)
+        sentence_embedding = sentence_embedding + steps
 
         # Pass through GAT layers
         # x_res = x
         x = self.conv1(x, edge_index)
         x = F.elu(x)
+        
+        x = self.norm_layer1(x)
         # # Match dimensions for residual connection
         # x_res = self.proj_residual(x_res, x.size(1))
         # x = x + x_res
@@ -87,6 +92,8 @@ class CategoricalGATPolicy(nn.Module):
         # x_res = x
         x, attention = self.conv2(
             x, edge_index, return_attention_weights=True)
+        
+        x = self.norm_layer2(x)
         # x_res = self.proj_residual(x_res, x.size(1))
         # x = x + x_res
 
@@ -130,8 +137,9 @@ class CategoricalGATPolicy(nn.Module):
         return action, x, attention, action_logits
 
     def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step: int=0, pruned_nodes=[], batch_size=1):
+        
         _, x, attention, logits = self.clean_action(
-            x, edge_index, active_node_idx, sentence, return_only_action=False, step=step, pruned_nodes=[], batch_size=batch_size)
+            x, edge_index, active_node_idx, sentence, return_only_action=False, step=step, pruned_nodes=pruned_nodes, batch_size=batch_size)
 
         dist = Categorical(logits=logits)
         action = dist.sample()

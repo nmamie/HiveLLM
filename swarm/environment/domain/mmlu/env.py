@@ -13,14 +13,20 @@ class GymWrapper:
 
     """
 
-    def __init__(self, swarm, dataset, train, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs):
+    def __init__(self, swarm, graph, train_dataset, val_dataset, train, test, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs):
         """
         A base template for all environment wrappers.
         """
-        self.env = swarm
+        self.swarm = swarm
+        self.env = graph
         self.is_discrete = True
-        self.dataset = dataset
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
         self.train = train
+        if test:
+            self.dataset = self.val_dataset
+        else:
+            self.dataset = self.train_dataset
         # self.loader = loader
         self.num_pot_edges = num_pot_edges
         self.num_nodes = num_nodes
@@ -33,6 +39,7 @@ class GymWrapper:
         self.idx2node = idx2node
         self.edge_index = edge_index
         self.num_envs = num_envs
+        self.pruned_nodes = []
 
         # State and Action Parameters
         self.state_dim = self.num_node_features
@@ -67,6 +74,9 @@ class GymWrapper:
         if len(records) > 0:
             yield records
         return
+    
+    def prune(self, pruned_nodes: List[int]):
+        self.pruned_nodes = pruned_nodes
 
     def reset(self, records=None):
         """Method overloads reset
@@ -76,14 +86,17 @@ class GymWrapper:
             Returns:
                 next_obs (list): Next state
         """
-        state, self.edge_index, self.current_node_id = asyncio.run(self.env.reset(self.node_features, self.node2idx))
+        state, self.current_node_id = asyncio.run(self.env.reset(self.node_features, self.pruned_nodes, self.node2idx))
+        print("Current Node ID:", self.current_node_id)
         records = []
         for i, record in zip(range(self.num_envs), self.loader):
             records.append(record)
             
         state[self.node2idx[self.current_node_id]] = state[self.node2idx[self.current_node_id]] + self.state_indicator
-            
-        return state, self.edge_index, self.node2idx[self.current_node_id], records
+        
+        print("Current Node:", self.node2idx[self.current_node_id])
+
+        return state, self.swarm.connection_dist.edge_index, self.node2idx[self.current_node_id], records
         
 
     def step(self, action, record, state, edge_index): #Expects a numpy action
@@ -126,13 +139,13 @@ class GymWrapper:
         if self.train:
             self.train = False
             self.loader = self._eval_loader(batch_size=1, dataset=self.dataset, limit_questions=153)
-        state, self.edge_index, self.current_node_id = await self.env.reset(self.node_features, self.node2idx)
+        state, self.current_node_id = await self.env.reset(self.node_features, self.pruned_nodes, self.node2idx)
         state[self.node2idx[self.current_node_id]] = state[self.node2idx[self.current_node_id]] + self.state_indicator
         records = []
         record = next(self.loader)
         records.append(record)   
             
-        return state, self.edge_index, self.node2idx[self.current_node_id], records
+        return state, self.swarm.connection_dist.edge_index, self.node2idx[self.current_node_id], records
         
 
     async def val_step(self, action, record, state, edge_index): #Expects a numpy action

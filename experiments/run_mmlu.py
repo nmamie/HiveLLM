@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('--batchsize', type=int, help='Batch size',  default=128) #64
     parser.add_argument('--num_envs', type=int, help='Number of environments to average on',  default=4)
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=2000)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=4000)
 
     #ALGO SPECIFIC ARGS
     parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10

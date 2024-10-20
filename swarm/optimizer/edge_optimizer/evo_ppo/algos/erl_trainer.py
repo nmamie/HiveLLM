@@ -16,17 +16,18 @@ import torch
 
 class ERL_Trainer:
 
-	def __init__(self, args, art_dir_name, swarm, model_constructor, train_env_constructor, val_env_constructor, num_nodes, num_edges):
+	def __init__(self, args, art_dir_name, swarm, realized_graph, model_constructor, env_constructor, num_nodes, num_edges):
 
 		self.args = args
 		self._art_dir_name = art_dir_name
-		self.policy_string = 'CategoricalPolicy' if val_env_constructor.is_discrete else 'Gaussian_FF'
+		self.policy_string = 'CategoricalPolicy' if env_constructor.is_discrete else 'Gaussian_FF'
 		self.manager = Manager()
 		self._swarm = swarm
+		self._realized_graph = realized_graph
 		self.num_nodes = num_nodes
 		self.num_edges = num_edges
-		self.train_env_constructor = train_env_constructor
-		self.val_env_constructor = val_env_constructor
+		self.pruned_nodes = []
+		self.env_constructor = env_constructor
 		self.device = torch.device(args.gpu_id if torch.cuda.is_available() else "cpu")
   
   		#Save best policy
@@ -42,7 +43,7 @@ class ERL_Trainer:
 				self.population.append(model_constructor.make_model(self.policy_string))
 
 			#PG Learner
-			if train_env_constructor.is_discrete:
+			if env_constructor.is_discrete:
 				from swarm.optimizer.edge_optimizer.evo_ppo.algos.ddqn import DDQN
 				self.learner = DDQN(args, model_constructor)
 			else:
@@ -61,14 +62,14 @@ class ERL_Trainer:
 			#Evolutionary population Rollout workers
 			self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
 			self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
-			self.evo_workers = [Process(target=rollout_worker, args=(id, 'evo', self.evo_task_pipes[id][1], self.evo_result_pipes[id][0], args.rollout_size > 0, self.population, train_env_constructor)) for id in range(args.pop_size)]
+			self.evo_workers = [Process(target=rollout_worker, args=(id, 'evo', self.evo_task_pipes[id][1], self.evo_result_pipes[id][0], args.rollout_size > 0, self.population, env_constructor)) for id in range(args.pop_size)]
 			for worker in self.evo_workers: worker.start()
 			self.evo_flag = [True for _ in range(args.pop_size)]
 
 			#Learner rollout workers
 			self.task_pipes = [Pipe() for _ in range(args.rollout_size)]
 			self.result_pipes = [Pipe() for _ in range(args.rollout_size)]
-			self.workers = [Process(target=rollout_worker, args=(id, 'pg', self.task_pipes[id][1], self.result_pipes[id][0], True, self.rollout_bucket, train_env_constructor)) for id in range(args.rollout_size)]
+			self.workers = [Process(target=rollout_worker, args=(id, 'pg', self.task_pipes[id][1], self.result_pipes[id][0], True, self.rollout_bucket, env_constructor)) for id in range(args.rollout_size)]
 			for worker in self.workers: worker.start()
 			self.roll_flag = [True for _ in range(args.rollout_size)]
 
@@ -79,7 +80,7 @@ class ERL_Trainer:
 			# Test workers
 			self.test_task_pipes = [Pipe() for _ in range(args.num_test)]
 			self.test_result_pipes = [Pipe() for _ in range(args.num_test)]
-			self.test_workers = [Process(target=rollout_worker, args=(id, 'test', self.test_task_pipes[id][1], self.test_result_pipes[id][0], False, self.test_bucket, val_env_constructor)) for id in range(args.num_test)]
+			self.test_workers = [Process(target=rollout_worker, args=(id, 'test', self.test_task_pipes[id][1], self.test_result_pipes[id][0], False, self.test_bucket, env_constructor)) for id in range(args.num_test)]
 			for worker in self.test_workers: worker.start()
 			self.test_flag = False
 
@@ -127,22 +128,26 @@ class ERL_Trainer:
 		all_fitness = []; all_eplens = []
 		if self.args.pop_size > 1:
 			for i in range(self.args.pop_size):
-				_, fitness, frames, trajectory = self.evo_result_pipes[i][1].recv()
+				_, fitness, frames, trajectory, pruned_nodes = self.evo_result_pipes[i][1].recv()
 
 				all_fitness.append(fitness); all_eplens.append(frames)
 				self.gen_frames+= frames; self.total_frames += frames
 				self.replay_buffer.add(trajectory)
 				self.best_score = max(self.best_score, fitness)
+				if fitness == self.best_score:
+					self.pruned_nodes = pruned_nodes
 				gen_max = max(gen_max, fitness)
 
 		########## JOIN ROLLOUTS FOR LEARNER ROLLOUTS ############
 		rollout_fitness = []; rollout_eplens = []
 		if self.args.rollout_size > 0:
 			for i in range(self.args.rollout_size):
-				_, fitness, pg_frames, trajectory = self.result_pipes[i][1].recv()
+				_, fitness, pg_frames, trajectory, pruned_nodes = self.result_pipes[i][1].recv()
 				self.replay_buffer.add(trajectory)
 				self.gen_frames += pg_frames; self.total_frames += pg_frames
 				self.best_score = max(self.best_score, fitness)
+				if fitness == self.best_score:
+					self.pruned_nodes = pruned_nodes
 				gen_max = max(gen_max, fitness)
 				rollout_fitness.append(fitness); rollout_eplens.append(pg_frames)
 
@@ -164,7 +169,7 @@ class ERL_Trainer:
 			self.test_flag = False
 			test_scores = []
 			for pipe in self.test_result_pipes: #Collect all results
-				_, fitness, _, _ = pipe[1].recv()
+				_, fitness, _, _, _ = pipe[1].recv()
 				self.best_score = max(self.best_score, fitness)
 				gen_max = max(gen_max, fitness)
 				test_scores.append(fitness)
@@ -179,7 +184,12 @@ class ERL_Trainer:
 				torch.save({
 					'policy': self.best_policy.state_dict(), 
 					'init': self._swarm.connection_dist.node_features,
-					'state': self._swarm.connection_dist.state_indicator
+					'state': self._swarm.connection_dist.state_indicator,
+					'edges': self._swarm.connection_dist.edge_index,
+					'graph': self._realized_graph,
+					'node2idx': self._swarm.connection_dist.node_id2idx,
+					'idx2node': self._swarm.connection_dist.node_idx2id,
+					'pruned_nodes': self.pruned_nodes
 				}, self.args.aux_folder + '_best'+self.args.savetag)
 				logger.info('Best policy saved with score:%.2f' % self.test_score)
 
@@ -247,9 +257,14 @@ class ERL_Trainer:
 			self.best_policy.load_state_dict(model_state['policy'])
 			self._swarm.connection_dist.node_features = model_state['init']
 			self._swarm.connection_dist.state_indicator = model_state['state']
+			self._swarm.connection_dist.edge_index = model_state['edges']
+			self._realized_graph = model_state['graph']
+			self._swarm.connection_dist.node_id2idx = model_state['node2idx']
+			self._swarm.connection_dist.node_idx2id = model_state['idx2node']
+			self.pruned_nodes = model_state['pruned_nodes']
 		self.best_policy.to(self.device)
 		self.best_policy.eval()
-		env = self.val_env_constructor.make_env()
+		env = self.env_constructor.make_env(test=True, graph=self._realized_graph, node2idx=self._swarm.connection_dist.node_id2idx, idx2node=self._swarm.connection_dist.node_idx2id, node_features=self._swarm.connection_dist.node_features, state_indicator=self._swarm.connection_dist.state_indicator, edge_index=self._swarm.connection_dist.edge_index)
 		accuracy = Accuracy()
   
 		progress_bar = tqdm(total=limit_questions)
@@ -257,14 +272,14 @@ class ERL_Trainer:
 			print(80*'-')
 			state, edge_index, active_node_idx, records = await env.val_reset()
 			record = records[0][0]
-			sentence = record
+			sentence = record['question']
 			print("Question:", sentence)
 			done = False
 			steps = 0
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
-				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence, step=steps)
+				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence, step=steps, pruned_nodes=self.pruned_nodes)
 				state, active_node_idx, reward, done, final_answers = await env.val_step(action, record, state, edge_index)
 				steps += 1
 			raw_answer = final_answers[0]

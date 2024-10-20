@@ -3,6 +3,7 @@
 
 from importlib.metadata import requires
 import pdb
+import numpy as np
 import torch
 import torch.nn as nn
 from copy import deepcopy
@@ -62,7 +63,7 @@ class EdgeWiseDistribution(ConnectDistribution):
         # # Convert the edges to index format
         # self.edge_index = torch.tensor([[node_to_index[edge[0]], node_to_index[edge[1]]] for edge in edges], dtype=torch.long, requires_grad=False).t()
         self.edge_index = None
-        
+                
     def random_sample_num_edges(self, graph: CompositeGraph, num_edges: int) -> CompositeGraph:
         _graph = deepcopy(graph)
         while True:
@@ -194,6 +195,36 @@ class EdgeWiseDistribution(ConnectDistribution):
             if not _graph.check_cycle(in_node, {out_node}, set()):
                 out_node.add_successor(in_node)
                 in_node.add_predecessor(out_node)
+                
+        def is_node_useful(node):
+            if node in _graph.output_nodes:
+                return True
+            
+            for successor in node.successors:
+                if is_node_useful(successor):
+                    return True
+            return False
+                
+        useful_node_ids = [node_id for node_id, node in _graph.nodes.items() if is_node_useful(node)]
+        in_degree = {node_id: len(_graph.nodes[node_id].predecessors) for node_id in useful_node_ids}
+        # out_degree = {node_id: len(self.nodes[node_id].successors) for node_id in self.useful_node_ids}
+        zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
+                
+        edge_index = []
+        while zero_in_degree_queue:
+            node_id = zero_in_degree_queue.pop(0)
+            node = _graph.nodes[node_id]
+            for successor in node.successors:
+                edge_index.append([self.node_id2idx[node_id], self.node_id2idx[successor.id]])
+                in_degree[successor.id] -= 1
+                if in_degree[successor.id] == 0:
+                    zero_in_degree_queue.append(successor.id)
+                    
+        self.edge_index = torch.tensor(edge_index, dtype=torch.long).t()
+        
+        print(f"Edge index: {self.edge_index}")
+        
+        
         return _graph
 
     def realize_mask(self, graph: CompositeGraph, edge_mask: torch.Tensor) -> CompositeGraph:
