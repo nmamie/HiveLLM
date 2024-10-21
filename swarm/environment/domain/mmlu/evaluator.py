@@ -61,7 +61,7 @@ class Evaluator():
             
         self.utilities = []
             
-        self.device = torch.device(args.gpu_id if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
         
         self.args = args
 

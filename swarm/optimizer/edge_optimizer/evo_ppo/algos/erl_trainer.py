@@ -28,7 +28,7 @@ class ERL_Trainer:
 		self.num_edges = num_edges
 		self.pruned_nodes = []
 		self.env_constructor = env_constructor
-		self.device = torch.device(args.gpu_id if torch.cuda.is_available() else "cpu")
+		self.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
   
   		#Save best policy
 		self.best_policy = model_constructor.make_model(self.policy_string)
@@ -118,8 +118,8 @@ class ERL_Trainer:
 		############# UPDATE PARAMS USING GRADIENT DESCENT ##########
 		if self.replay_buffer.__len__() > self.args.learning_start: ###BURN IN PERIOD
 			for _ in range(int(self.gen_frames * self.args.gradperstep)):
-				s, ns, a, r, n, t, e, done = self.replay_buffer.sample(self.args.batch_size)
-				self.learner.update_parameters(s, ns, a, r, n, t, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
+				s, ns, a, r, n, nn, t, e, done = self.replay_buffer.sample(self.args.batch_size)
+				self.learner.update_parameters(s, ns, a, r, n, nn, t, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
 
 			self.gen_frames = 0
 
@@ -279,7 +279,7 @@ class ERL_Trainer:
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
-				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence, step=steps, pruned_nodes=self.pruned_nodes)
+				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence, step=steps, pruned_nodes=[])
 				state, active_node_idx, reward, done, final_answers = await env.val_step(action, record, state, edge_index)
 				steps += 1
 			raw_answer = final_answers[0]

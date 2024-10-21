@@ -67,17 +67,17 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                 # ---- CALL GAT NETWORK FOR ACTION SELECTION ----
                 if type != 'test':
                     with torch.no_grad():
-                        action, x, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence, return_only_action=False, step=steps, pruned_nodes=pruned_nodes)  # Choose an action from the policy network
+                        action, x, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence, return_only_action=False, step=steps, pruned_nodes=[])  # Choose an action from the policy network
                 else:
                     with torch.no_grad():
-                        action, x, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence, return_only_action=False, step=steps, pruned_nodes=pruned_nodes)
+                        action, x, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence, return_only_action=False, step=steps, pruned_nodes=[])
 
                 # # softmax
                 # action_logits_soft = F.softmax(logits, dim=1)
                 # print("Action logits:", action_logits_soft)
                 
                 # Simulate one step in environment
-                next_state, active_node_idx, reward, done, info = env.step(action.flatten(), record, state, edge_index)
+                next_state, next_active_node_idx, reward, done, info = env.step(action.flatten(), record, state, edge_index)
                 
                 fitness += reward
 
@@ -91,11 +91,12 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                     # store the rollout trajectory
                     rollout_trajectory.append([
                         np.array([state_traj]), np.array([next_state_traj]),
-                        np.float32(action_traj), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])),
+                        np.float32(action_traj), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])), np.float32(np.array([next_active_node_idx])),
                         np.float32(np.array([steps])), np.array([edge_index_traj]), np.float32(np.array([float(done)]))
                     ])
                 
                 state = next_state
+                active_node_idx = next_active_node_idx
                 total_frame += 1
                 steps += 1
 

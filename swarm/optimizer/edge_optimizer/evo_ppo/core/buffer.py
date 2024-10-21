@@ -21,6 +21,7 @@ class Buffer():
         self.a = []
         self.r = []
         self.n = []
+        self.nn = []
         self.t = []
         self.e = []
         self.done = []
@@ -34,9 +35,10 @@ class Buffer():
             self.a.append(torch.Tensor(exp[2]))
             self.r.append(torch.Tensor(exp[3]))
             self.n.append(torch.Tensor(exp[4]))
-            self.t.append(torch.Tensor(exp[5]))
-            self.e.append(torch.Tensor(exp[6]))
-            self.done.append(torch.Tensor(exp[7]))
+            self.nn.append(torch.Tensor(exp[5]))
+            self.t.append(torch.Tensor(exp[6]))
+            self.e.append(torch.Tensor(exp[7]))
+            self.done.append(torch.Tensor(exp[8]))
 
         # Trim to make the buffer size < capacity
         while self.__len__() > self.capacity:
@@ -45,6 +47,7 @@ class Buffer():
             self.a.pop(0)
             self.r.pop(0)
             self.n.pop(0)
+            self.nn.pop(0)
             self.t.pop(0)
             self.e.pop(0)
             self.done.pop(0)
@@ -65,6 +68,7 @@ class Buffer():
             torch.cat([self.a[i] for i in ind]), \
             torch.cat([self.r[i] for i in ind]), \
             torch.cat([self.n[i] for i in ind]), \
+            torch.cat([self.nn[i] for i in ind]), \
             torch.cat([self.t[i] for i in ind]), \
             torch.cat([self.e[i] for i in ind]), \
             torch.cat([self.done[i] for i in ind])

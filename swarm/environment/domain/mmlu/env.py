@@ -125,8 +125,7 @@ class GymWrapper:
                     
         # next_state = np.expand_dims(next_state, axis=0)
         return next_state, self.node2idx[self.current_node_id], reward, terminate, final_answers
-        
-        
+
         
     async def val_reset(self):
         """Method overloads reset

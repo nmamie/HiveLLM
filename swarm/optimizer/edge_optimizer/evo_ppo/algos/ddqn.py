@@ -15,7 +15,7 @@ class DDQN(object):
         self.gamma = args.gamma
         self.tau = args.tau
         self.alpha = args.alpha
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
 
         self.actor = model_constructor.make_model('CategoricalPolicy').to(device=self.device)
         self.actor_optim = Adam(self.actor.parameters(), lr=args.actor_lr)
@@ -27,7 +27,7 @@ class DDQN(object):
         self.softmax = torch.nn.Softmax(dim=1)
         self.num_updates = 0
 
-    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, active_node_batch, step_batch, edge_index_batch, done_batch, batch_size, node_feature_size, num_nodes, num_edges):
+    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, active_node_batch, next_active_node_batch, step_batch, edge_index_batch, done_batch, batch_size, node_feature_size, num_nodes, num_edges):
         state_batch = torch.reshape(state_batch, (batch_size, num_nodes, node_feature_size))
         next_state_batch = torch.reshape(next_state_batch, (batch_size, num_nodes, node_feature_size))
         # edge_index_batch = torch.reshape(edge_index_batch, (batch_size, 2, num_edges))
@@ -37,6 +37,7 @@ class DDQN(object):
         action_batch=action_batch.to(self.device)
         reward_batch=reward_batch.to(self.device)
         active_node_batch=active_node_batch.to(self.device)
+        next_active_node_batch=next_active_node_batch.to(self.device)
         step_batch=step_batch.to(self.device)
         edge_index_batch=edge_index_batch.to(self.device)
         done_batch=done_batch.to(self.device)
@@ -50,7 +51,7 @@ class DDQN(object):
                 # Example edge index for this graph
                 edge_index = edge_index_batch[i].long()
                 
-                active_node = active_node_batch[i].long()
+                active_node = next_active_node_batch[i].long()
                 
                 step = step_batch[i].long()
 

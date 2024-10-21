@@ -14,7 +14,7 @@ from transformers import BertModel, BertTokenizer
 
 # Load pre-trained BERT model and tokenizer
 # Using a distilled BERT model (smaller and faster with fewer parameters)
-bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda')
+bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda:7')
 tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
 
 # Freeze BERT model parameters
@@ -65,7 +65,7 @@ class CategoricalGATPolicy(nn.Module):
     def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step=0, pruned_nodes=[], batch_size=1):
         
         # Encode sentence with BERT
-        inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to('cuda')
+        inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to('cuda:7')
         with torch.no_grad():
             sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
             sentence_embedding = sentence_embedding.to(x.device)

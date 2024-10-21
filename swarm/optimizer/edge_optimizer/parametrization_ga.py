@@ -43,7 +43,7 @@ class EdgeWiseDistribution(ConnectDistribution):
         # init_tensor = torch.ones(
         #     len(potential_connections)) * init_logit
         # self.edge_logits = torch.nn.Parameter(init_tensor)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda:7' if torch.cuda.is_available() else 'cpu')
         node_ids = set([x for pair in potential_connections for x in pair])
         self.node_idx2id = {i: node_id for i, node_id in enumerate(node_ids)}
         self.node_id2idx = {node_id: i for i, node_id in enumerate(node_ids)}
