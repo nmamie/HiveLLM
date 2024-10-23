@@ -27,13 +27,14 @@ class DDQN(object):
         self.softmax = torch.nn.Softmax(dim=1)
         self.num_updates = 0
 
-    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, active_node_batch, next_active_node_batch, step_batch, edge_index_batch, done_batch, batch_size, node_feature_size, num_nodes, num_edges):
+    def update_parameters(self, state_batch, next_state_batch, sentence_emb_batch, action_batch, reward_batch, active_node_batch, next_active_node_batch, step_batch, edge_index_batch, done_batch, batch_size, node_feature_size, num_nodes, num_edges):
         state_batch = torch.reshape(state_batch, (batch_size, num_nodes, node_feature_size))
         next_state_batch = torch.reshape(next_state_batch, (batch_size, num_nodes, node_feature_size))
         # edge_index_batch = torch.reshape(edge_index_batch, (batch_size, 2, num_edges))
         
         state_batch = state_batch.to(self.device)
         next_state_batch=next_state_batch.to(self.device)
+        sentence_emb_batch = sentence_emb_batch.to(self.device)
         action_batch=action_batch.to(self.device)
         reward_batch=reward_batch.to(self.device)
         active_node_batch=active_node_batch.to(self.device)
@@ -48,6 +49,8 @@ class DDQN(object):
             for i in range(batch_size):
                 # Example node features: 3 nodes, each with 128 features
                 x = next_state_batch[i]
+                sentence_emb = sentence_emb_batch[i]
+                
                 # Example edge index for this graph
                 edge_index = edge_index_batch[i].long()
                 
@@ -56,14 +59,14 @@ class DDQN(object):
                 step = step_batch[i].long()
 
                 # Create a Data object for each graph
-                data = Data(x=x, edge_index=edge_index, active_node=active_node, step=step)
+                data = Data(x=x, edge_index=edge_index, active_node=active_node, step=step, sentence_emb=sentence_emb)
                 data_list.append(data)
 
             # Batch the graphs
             batch = Batch.from_data_list(data_list)
                                     
-            na = self.actor.clean_action(batch.x, batch.edge_index, batch.active_node, "", return_only_action=True, step=batch.step, batch_size=batch_size)
-            _, _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, batch.active_node, "", return_only_action=False, step=batch.step, batch_size=batch_size)
+            na = self.actor.clean_action(batch.x, batch.edge_index, batch.active_node, batch.sentence_emb, return_only_action=True, step=batch.step, batch_size=batch_size)
+            _, _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, batch.active_node, batch.sentence_emb, return_only_action=False, step=batch.step, batch_size=batch_size)
                         
             next_entropy = -(F.softmax(ns_logits, dim=1) * F.log_softmax(ns_logits, dim=1)).mean(1).unsqueeze(1)
             
@@ -79,6 +82,8 @@ class DDQN(object):
         for i in range(batch_size):
             # Example node features: 3 nodes, each with 64 features
             x = state_batch[i]
+            sentence_emb = sentence_emb_batch[i]
+            
             # Example edge index for this graph
             edge_index = edge_index_batch[i].long()
             
@@ -87,13 +92,13 @@ class DDQN(object):
             step = step_batch[i].long()
 
             # Create a Data object for each graph
-            data = Data(x=x, edge_index=edge_index, active_node=active_node, step=step)
+            data = Data(x=x, edge_index=edge_index, active_node=active_node, step=step, sentence_emb=sentence_emb)
             data_list.append(data)
 
         # Batch the graphs
         batch = Batch.from_data_list(data_list)
 
-        _, _, _, logits  = self.actor.noisy_action(batch.x, batch.edge_index, batch.active_node, "", return_only_action=False, step=batch.step, batch_size=batch_size)
+        _, _, _, logits  = self.actor.noisy_action(batch.x, batch.edge_index, batch.active_node, batch.sentence_emb, return_only_action=False, step=batch.step, batch_size=batch_size)
         entropy = -(F.softmax(logits, dim=1) * F.log_softmax(logits, dim=1)).mean(1).unsqueeze(1)
         q_val = logits.gather(1, action_batch)
 

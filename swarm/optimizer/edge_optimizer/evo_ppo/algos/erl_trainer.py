@@ -14,6 +14,8 @@ from swarm.utils.log import logger
 from experiments.evaluator.accuracy import Accuracy
 import torch
 
+from transformers import BertModel, BertTokenizer
+
 class ERL_Trainer:
 
 	def __init__(self, args, art_dir_name, swarm, realized_graph, model_constructor, env_constructor, num_nodes, num_edges):
@@ -118,8 +120,8 @@ class ERL_Trainer:
 		############# UPDATE PARAMS USING GRADIENT DESCENT ##########
 		if self.replay_buffer.__len__() > self.args.learning_start: ###BURN IN PERIOD
 			for _ in range(int(self.gen_frames * self.args.gradperstep)):
-				s, ns, a, r, n, nn, t, e, done = self.replay_buffer.sample(self.args.batch_size)
-				self.learner.update_parameters(s, ns, a, r, n, nn, t, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
+				s, ns, emb, a, r, n, nn, t, e, done = self.replay_buffer.sample(self.args.batch_size)
+				self.learner.update_parameters(s, ns, emb, a, r, n, nn, t, e, done, self.args.batch_size, self.args.node_feature_size, self.num_nodes, self.num_edges)
 
 			self.gen_frames = 0
 
@@ -252,7 +254,7 @@ class ERL_Trainer:
 		Returns:
 			float: Validation score
 		"""
-		if not self.args.train:
+		if not self.args.train:             
 			model_state = torch.load(self.args.aux_folder + '_best'+self.args.savetag)
 			self.best_policy.load_state_dict(model_state['policy'])
 			self._swarm.connection_dist.node_features = model_state['init']
@@ -264,22 +266,43 @@ class ERL_Trainer:
 			self.pruned_nodes = model_state['pruned_nodes']
 		self.best_policy.to(self.device)
 		self.best_policy.eval()
+		# Load pre-trained BERT model and tokenizer
+		#	 Using a distilled BERT model (smaller and faster with fewer parameters)
+		bert = BertModel.from_pretrained('distilbert-base-uncased')
+		bert = bert.to(self.device)
+		tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
+
+		# Freeze BERT model parameters
+		for param in bert.parameters():
+				param.requires_grad = False
+
 		env = self.env_constructor.make_env(test=True, graph=self._realized_graph, node2idx=self._swarm.connection_dist.node_id2idx, idx2node=self._swarm.connection_dist.node_idx2id, node_features=self._swarm.connection_dist.node_features, state_indicator=self._swarm.connection_dist.state_indicator, edge_index=self._swarm.connection_dist.edge_index)
+		env.prune(self.pruned_nodes)
+		print(f"Pruned nodes: {self.pruned_nodes}")
 		accuracy = Accuracy()
   
 		progress_bar = tqdm(total=limit_questions)
 		while True:
 			print(80*'-')
 			state, edge_index, active_node_idx, records = await env.val_reset()
+			# remove pruned nodes from edge_index
+			if len(self.pruned_nodes) > 0:
+				for i in range(len(edge_index[0])):
+					if edge_index[0][i] in self.pruned_nodes or edge_index[1][i] in self.pruned_nodes:
+						edge_index[0][i] = -1
+						edge_index[1][i] = -1
 			record = records[0][0]
 			sentence = record['question']
+			inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to(bert.device)
+			with torch.no_grad():
+				sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
 			print("Question:", sentence)
 			done = False
 			steps = 0
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
-				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence, step=steps, pruned_nodes=[])
+				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence_embedding, step=steps, pruned_nodes=[])
 				state, active_node_idx, reward, done, final_answers = await env.val_step(action, record, state, edge_index)
 				steps += 1
 			raw_answer = final_answers[0]

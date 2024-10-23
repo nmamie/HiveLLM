@@ -25,6 +25,7 @@ from experiments.evaluator.accuracy import Accuracy
 from swarm.optimizer.edge_optimizer.evo_tools.GARL import GARL
 
 from datasets import Dataset
+from transformers import BertModel, BertTokenizer
 
 class Evaluator():
     def __init__(
@@ -262,6 +263,16 @@ class Evaluator():
 
         # loader = infinite_data_loader()
         
+        # Load pre-trained BERT model and tokenizer
+		# Using a distilled BERT model (smaller and faster with fewer parameters)
+        bert = BertModel.from_pretrained('distilbert-base-uncased')
+        bert = bert.to(self.device)
+        tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
+
+        # Freeze BERT model parameters
+        for param in bert.parameters():
+            param.requires_grad = False
+        
         # realize full swarm
         realized_graph = self._swarm.connection_dist.realize_full(self._swarm.composite_graph)
         
@@ -273,7 +284,7 @@ class Evaluator():
         potential_connections = self._swarm.connection_dist.potential_connections
         
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(self._swarm, realized_graph, train_dataset, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
+        env_constructor = EnvConstructor(self._swarm, realized_graph, bert, tokenizer, train_dataset, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
         
         # if self.args.train:
         #     train_env_constructor = EnvConstructor(realized_graph, train_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)

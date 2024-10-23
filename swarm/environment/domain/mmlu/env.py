@@ -2,6 +2,7 @@ import asyncio
 from typing import Any, Iterator, List
 import numpy as np
 import pandas as pd
+import torch
 
 
 class GymWrapper:
@@ -13,12 +14,14 @@ class GymWrapper:
 
     """
 
-    def __init__(self, swarm, graph, train_dataset, val_dataset, train, test, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs):
+    def __init__(self, swarm, graph, bert, tokenizer, train_dataset, val_dataset, train, test, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs):
         """
         A base template for all environment wrappers.
         """
         self.swarm = swarm
         self.env = graph
+        self.bert = bert
+        self.tokenizer = tokenizer
         self.is_discrete = True
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
@@ -90,7 +93,12 @@ class GymWrapper:
         print("Current Node ID:", self.current_node_id)
         records = []
         for i, record in zip(range(self.num_envs), self.loader):
-            records.append(record)
+            # Encode sentence with BERT
+            sentence = record['question']
+            inputs = self.tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to(self.bert.device)
+            with torch.no_grad():
+                sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
+            records.append((record, sentence_embedding))
             
         state[self.node2idx[self.current_node_id]] = state[self.node2idx[self.current_node_id]] + self.state_indicator
         
@@ -142,7 +150,13 @@ class GymWrapper:
         state[self.node2idx[self.current_node_id]] = state[self.node2idx[self.current_node_id]] + self.state_indicator
         records = []
         record = next(self.loader)
-        records.append(record)   
+        # Encode sentence with BERT
+        sentence = record['question']
+        inputs = self.tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to(self.bert.device)
+        with torch.no_grad():
+            sentence_embedding = self.bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
+            sentence_embedding = sentence_embedding.to(self.bert.device)
+        records.append((record, sentence_embedding)) 
             
         return state, self.swarm.connection_dist.edge_index, self.node2idx[self.current_node_id], records
         

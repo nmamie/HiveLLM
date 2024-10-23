@@ -18,6 +18,7 @@ class Buffer():
         self.manager = Manager()
         self.s = []
         self.ns = []
+        self.emb = []
         self.a = []
         self.r = []
         self.n = []
@@ -32,18 +33,20 @@ class Buffer():
         for exp in trajectory:
             self.s.append(torch.Tensor(exp[0]))
             self.ns.append(torch.Tensor(exp[1]))
-            self.a.append(torch.Tensor(exp[2]))
-            self.r.append(torch.Tensor(exp[3]))
-            self.n.append(torch.Tensor(exp[4]))
-            self.nn.append(torch.Tensor(exp[5]))
-            self.t.append(torch.Tensor(exp[6]))
-            self.e.append(torch.Tensor(exp[7]))
-            self.done.append(torch.Tensor(exp[8]))
+            self.emb.append(torch.Tensor(exp[2]))
+            self.a.append(torch.Tensor(exp[3]))
+            self.r.append(torch.Tensor(exp[4]))
+            self.n.append(torch.Tensor(exp[5]))
+            self.nn.append(torch.Tensor(exp[6]))
+            self.t.append(torch.Tensor(exp[7]))
+            self.e.append(torch.Tensor(exp[8]))
+            self.done.append(torch.Tensor(exp[9]))
 
         # Trim to make the buffer size < capacity
         while self.__len__() > self.capacity:
             self.s.pop(0)
             self.ns.pop(0)
+            self.emb.pop(0)
             self.a.pop(0)
             self.r.pop(0)
             self.n.pop(0)
@@ -65,6 +68,7 @@ class Buffer():
         ind = random.sample(range(len(self.s)), batch_size)
         return torch.cat([self.s[i] for i in ind]), \
             torch.cat([self.ns[i] for i in ind]), \
+            torch.cat([self.emb[i] for i in ind]), \
             torch.cat([self.a[i] for i in ind]), \
             torch.cat([self.r[i] for i in ind]), \
             torch.cat([self.n[i] for i in ind]), \

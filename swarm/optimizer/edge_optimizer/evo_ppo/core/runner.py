@@ -34,22 +34,23 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         
         fitness = 0.0
         total_frame = 0
-        state, init_edge_index, active_node_idx, records = env.reset()
+        state, edge_index, active_node_idx, records = env.reset()
         
         rollout_trajectory = []
         # state = utils.to_tensor(state)
-        for record in records:
+        for record, sentence_emb in records:
             done = False
             steps = 0
+            
             while True:  # unless done    
                 sentence = record['question']
                                 
-                # edge index is not changed
-                edge_index = deepcopy(init_edge_index)
+                # # edge index is not changed
+                # edge_index = deepcopy(init_edge_index)
                                 
                 # if type != 'test':
                 
-                # remove prune nodes from edge_index
+                # remove pruned nodes from edge_index
                 if len(pruned_nodes) > 0:
                     for i in range(len(edge_index[0])):
                         if edge_index[0][i] in pruned_nodes or edge_index[1][i] in pruned_nodes:
@@ -65,12 +66,12 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                 # state[active_node_idx] += net.state_indicator_fc(state[active_node_idx])
                            
                 # ---- CALL GAT NETWORK FOR ACTION SELECTION ----
-                if type != 'test':
+                if type == 'pg':
                     with torch.no_grad():
-                        action, x, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence, return_only_action=False, step=steps, pruned_nodes=[])  # Choose an action from the policy network
+                        action, x, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence_emb, return_only_action=False, step=steps, pruned_nodes=pruned_nodes)  # Choose an action from the policy network
                 else:
                     with torch.no_grad():
-                        action, x, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence, return_only_action=False, step=steps, pruned_nodes=[])
+                        action, x, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence_emb, return_only_action=False, step=steps, pruned_nodes=[])
 
                 # # softmax
                 # action_logits_soft = F.softmax(logits, dim=1)
@@ -83,16 +84,17 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
 
                 # ---- STORE TRANSITIONS IF NEEDED ----
                 if store_data:  # Skip for test set
-                    # put all the data on cpu
-                    state_traj = state.detach().cpu().numpy()
-                    next_state_traj = next_state.detach().cpu().numpy()
-                    action_traj = action.detach().cpu().numpy()
-                    edge_index_traj = edge_index.detach().cpu().numpy()
+                    # # put all the data on cpu
+                    sentence_emb_traj = sentence_emb.cpu().numpy()
+                    # state_traj = state.detach().cpu().numpy()
+                    # next_state_traj = next_state.detach().cpu().numpy()
+                    # action_traj = action.detach().cpu().numpy()
+                    # edge_index_traj = edge_index.detach().cpu().numpy()
                     # store the rollout trajectory
                     rollout_trajectory.append([
-                        np.array([state_traj]), np.array([next_state_traj]),
-                        np.float32(action_traj), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])), np.float32(np.array([next_active_node_idx])),
-                        np.float32(np.array([steps])), np.array([edge_index_traj]), np.float32(np.array([float(done)]))
+                        np.array([state]), np.array([next_state]), np.array([sentence_emb_traj]),
+                        np.float32(action), np.float32(np.array([reward])), np.float32(np.array([active_node_idx])), np.float32(np.array([next_active_node_idx])),
+                        np.float32(np.array([steps])), np.array([edge_index]), np.float32(np.array([float(done)]))
                     ])
                 
                 state = next_state

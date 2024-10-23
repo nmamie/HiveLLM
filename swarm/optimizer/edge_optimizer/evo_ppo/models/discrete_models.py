@@ -9,18 +9,6 @@ from torch_geometric.nn.conv import GATConv
 
 from swarm.optimizer.edge_optimizer.graph_net.layers import GraphAttentionLayer
 
-from transformers import BertModel, BertTokenizer
-
-
-# Load pre-trained BERT model and tokenizer
-# Using a distilled BERT model (smaller and faster with fewer parameters)
-bert = BertModel.from_pretrained('distilbert-base-uncased').to('cuda:7')
-tokenizer = BertTokenizer.from_pretrained('distilbert-base-uncased')
-
-# Freeze BERT model parameters
-for param in bert.parameters():
-    param.requires_grad = False
-
 class CategoricalGATPolicy(nn.Module):
 
     """Critic model
@@ -62,21 +50,16 @@ class CategoricalGATPolicy(nn.Module):
         self.norm_layer2 = nn.LayerNorm(hidden_channels)
 
 
-    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step=0, pruned_nodes=[], batch_size=1):
-        
-        # Encode sentence with BERT
-        inputs = tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to('cuda:7')
-        with torch.no_grad():
-            sentence_embedding = bert(**inputs).last_hidden_state[:, 0, :]  # Use [CLS] token
-            sentence_embedding = sentence_embedding.to(x.device)
+    def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence_emb: torch.Tensor, return_only_action=True, step=0, pruned_nodes=[], batch_size=1):
         
         # merge different state embeddings to a single sentence embedding
+        sentence_emb = sentence_emb.to(x.device)
         steps = step + 1
         if batch_size == 1:
             steps = torch.tensor([steps], dtype=torch.float32).to(x.device)
         steps = steps.unsqueeze(1)
         steps = self.fc0(steps * 1e-2)  # Scale down step to avoid exploding gradients
-        sentence_embedding = self.fc1(sentence_embedding)
+        sentence_embedding = self.fc1(sentence_emb)
         sentence_embedding = sentence_embedding + steps
 
         # Pass through GAT layers
