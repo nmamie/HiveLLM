@@ -41,9 +41,10 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         for record, sentence_emb in records:
             done = False
             steps = 0
+            sentence_emb_traj = sentence_emb.cpu().numpy()
             
             while True:  # unless done    
-                sentence = record['question']
+                # sentence = record['question']
                                 
                 # # edge index is not changed
                 # edge_index = deepcopy(init_edge_index)
@@ -85,7 +86,6 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                 # ---- STORE TRANSITIONS IF NEEDED ----
                 if store_data:  # Skip for test set
                     # # put all the data on cpu
-                    sentence_emb_traj = sentence_emb.cpu().numpy()
                     # state_traj = state.detach().cpu().numpy()
                     # next_state_traj = next_state.detach().cpu().numpy()
                     # action_traj = action.detach().cpu().numpy()
@@ -136,6 +136,7 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
         # nodes that do not perform well should be pruned
         # if store_data:
         changes = False
+        pruned_nodes = []
         for node in rewards_dist:
             if rewards_dist[node] < -3.0 and action_dist[node] > 100: # adjust this threshold
                 if node not in pruned_nodes and len(pruned_nodes) < len(rewards_dist) - 1:

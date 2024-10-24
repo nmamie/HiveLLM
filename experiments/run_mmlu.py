@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument('--gamma', type=float, help='Discount Rate', default=0.99)
     parser.add_argument('--alpha', type=float, help='Alpha for Entropy term ',  default=0.1)
     parser.add_argument('--batchsize', type=int, help='Batch size',  default=128) #64
-    parser.add_argument('--num_envs', type=int, help='Number of environments to average on',  default=5)
+    parser.add_argument('--num_envs', type=int, help='Number of environments to average on',  default=4)
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
     parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=4000)
 

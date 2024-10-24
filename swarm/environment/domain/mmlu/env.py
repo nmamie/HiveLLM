@@ -151,6 +151,7 @@ class GymWrapper:
         records = []
         record = next(self.loader)
         # Encode sentence with BERT
+        record = record[0]
         sentence = record['question']
         inputs = self.tokenizer(sentence, return_tensors='pt', truncation=True, padding=True).to(self.bert.device)
         with torch.no_grad():
