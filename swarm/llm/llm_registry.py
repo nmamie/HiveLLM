@@ -35,6 +35,6 @@ class LLMRegistry:
             # model = cls.registry.get('GP
             # TChat', model_name) 
             # init
-            model = cls.registry.get('HuggingChat', pipeline)
+            model = cls.registry.get('HuggingChat', model_name)
 
         return model

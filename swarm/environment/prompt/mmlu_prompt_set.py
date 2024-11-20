@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from swarm.environment.prompt.prompt_set import PromptSet
 from swarm.environment.prompt.prompt_set_registry import PromptSetRegistry
@@ -20,6 +20,11 @@ class MMLUPromptSet(PromptSet):
     @staticmethod
     def get_adversarial_role():
         return "a deceitful adversary in question answering in a swarm full of truthful and adversarial experts"
+    
+    @staticmethod
+    def get_select_best(question: str, answers: List[str], constraint: str) -> str:
+        formatted_answers = "\n".join([f"{chr(65 + i)}. {answer}" for i, answer in enumerate(answers)])
+        return f"""Choose the best answer to the following question among the provided opinions of other agents and given the constraint:\n\nQuestion: {question}\n\nOpinions: {formatted_answers}\n\nConstraint: {constraint}"""
 
     @staticmethod
     def get_constraint():
@@ -27,10 +32,22 @@ class MMLUPromptSet(PromptSet):
             I will ask you a question.
             I will also give you 4 answers enumerated as A, B, C and D.
             Only one answer out of the offered 4 is correct.
-            You must choose the correct answer to the question.
+            You must choose the correct answer to the question, also considering the inputs from other agents.
             Your response must start with one of the 4 letters: A, B, C or D,
             corresponding to the correct answer.
             After the single-letter answer, add a very short explanation of why you gave this answer.
+        """
+        
+    @staticmethod
+    def get_special_constraint():
+        return """
+            I will ask you a question.
+            I will also give you 4 answers enumerated as A, B, C and D.
+            Only one answer out of the offered 4 is correct.
+            You must choose the correct answer to the question, also considering the inputs from other agents.
+            Your response must start with one of the 4 letters: A, B, C or D,
+            corresponding to the correct answer.
+            After the single-letter answer, provide a very short (max. 64 tokens) but informative input to the debate that reflects your opinion and addresses the other opinions.
         """
         
     @staticmethod

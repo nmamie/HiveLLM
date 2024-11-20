@@ -18,7 +18,7 @@ class DDQN(object):
         self.device = torch.device("cuda:" + str(args.gpu_id) if torch.cuda.is_available() else "cpu")
 
         self.actor = model_constructor.make_model('CategoricalPolicy').to(device=self.device)
-        self.actor_optim = Adam(self.actor.parameters(), lr=args.actor_lr)
+        self.actor_optim = Adam(self.actor.parameters(), lr=args.actor_lr, weight_decay=args.weight_decay)
 
         self.actor_target = model_constructor.make_model('CategoricalPolicy').to(device=self.device)
         hard_update(self.actor_target, self.actor)
@@ -66,8 +66,12 @@ class DDQN(object):
             batch = Batch.from_data_list(data_list)
                                     
             na = self.actor.clean_action(batch.x, batch.edge_index, batch.active_node, batch.sentence_emb, return_only_action=True, step=batch.step, batch_size=batch_size)
-            _, _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, batch.active_node, batch.sentence_emb, return_only_action=False, step=batch.step, batch_size=batch_size)
-                        
+            _, _, _, ns_logits = self.actor_target.noisy_action(batch.x, batch.edge_index, batch.active_node, batch.sentence_emb, return_only_action=False, step=batch.step, batch_size=batch_size)           
+            
+            # print("Action logits:", ns_logits)
+            # softmax_logits = F.softmax(ns_logits, dim=1)
+            # print("Softmax logits:", softmax_logits)
+            
             next_entropy = -(F.softmax(ns_logits, dim=1) * F.log_softmax(ns_logits, dim=1)).mean(1).unsqueeze(1)
             
             ns_logits = ns_logits.gather(1, na.unsqueeze(1))
@@ -109,7 +113,32 @@ class DDQN(object):
 
         self.actor_optim.zero_grad()
         q_loss.backward()
+        
+        # # monitor gradient norms
+        # print("Gradient norm before:", monitor_gradient_norms(self.actor))
+
+        # Then apply a lower clipping threshold
+        clip_gradients(self.actor, 10.0)
+        # print("Gradient norm after clipping:", monitor_gradient_norms(self.actor)) 
+        
         self.actor_optim.step()
 
         self.num_updates += 1
         soft_update(self.actor_target, self.actor, self.tau)
+        
+        # clean up cuda memory
+        torch.cuda.empty_cache()
+        
+# Gradient clipping function to prevent exploding gradients
+def clip_gradients(model, max_norm=1.0):
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+
+# Function to monitor gradient norms
+def monitor_gradient_norms(model):
+    total_norm = 0
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** 0.5
+    return total_norm

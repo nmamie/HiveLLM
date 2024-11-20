@@ -20,15 +20,19 @@ def parse_args():
     parser.add_argument('--mode', type=str, default='OptimizedSwarm',
                         choices=['DirectAnswer', 'FullConnectedSwarm', 'RandomSwarm', 'OptimizedSwarm'],
                         help="Mode of operation. Default is 'OptimizedSwarm'.")
-
+    
+    
     parser.add_argument('--num-truthful-agents', type=int, default=1,
-                        help="Number of truthful agents. The total will be N truthful and N adversarial.")
+                        help="Number of truthful agents.")
+
+    parser.add_argument('--num-adversarial-agents', type=int, default=1,
+                        help="Number of adversarial agents.")
 
     parser.add_argument('--num-iterations', type=int, default=100,
                         help="Number of optimization iterations. Default 100.")
 
     parser.add_argument('--model_name', type=str, default="inference",
-                        help="Model name, None runs the default ChatGPT4. Custom runs HF model. Inference runs the Meta-LLama-3.1-8B-Instruct model.")
+                        help="Model name, None runs the default ChatGPT4. Custom runs HF model. Inference runs the Meta-LLama-3.2-3B-Instruct model.")
 
     parser.add_argument('--domain', type=str, default="mmlu",
                         help="Domain (the same as dataset name), default 'MMLU'")
@@ -44,21 +48,23 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='Seed', default=991)
     parser.add_argument('--savetag', type=str, help='#Tag to append to savefile',  default='')
     parser.add_argument('--gpu_id', type=int, help='#GPU ID ',  default=0)
-    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.02)
-    parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.005)
+    parser.add_argument('--total_steps', type=float, help='#Total steps in the env in millions ', default=0.1)
+    parser.add_argument('--buffer', type=float, help='Buffer size in million',  default=0.05)
     # parser.add_argument('--frameskip', type=int, help='Frameskip',  default=1)
 
-    parser.add_argument('--node_feature_size', type=int, help='#Node Feature size',  default=128)
+    parser.add_argument('--node_feature_size', type=int, help='#Node Feature size',  default=768)
     parser.add_argument('--hidden_size', type=int, help='#Hidden Layer size',  default=64)
-    parser.add_argument('--critic_lr', type=float, help='Critic learning rate?', default=3e-4)
-    parser.add_argument('--actor_lr', type=float, help='Actor learning rate?', default=1e-4)
+    parser.add_argument('--critic_lr', type=float, help='Critic learning rate?', default=3e-4) #3e-4
+    parser.add_argument('--actor_lr', type=float, help='Actor learning rate?', default=1e-4) #1e-4
+    parser.add_argument('--weight_decay', type=float, help='Weight Decay', default=1e-5)
     parser.add_argument('--tau', type=float, help='Tau', default=1e-3)
     parser.add_argument('--gamma', type=float, help='Discount Rate', default=0.99)
     parser.add_argument('--alpha', type=float, help='Alpha for Entropy term ',  default=0.1)
-    parser.add_argument('--batchsize', type=int, help='Batch size',  default=128) #64
+    parser.add_argument('--batchsize', type=int, help='Batch size',  default=64) #64
     parser.add_argument('--num_envs', type=int, help='Number of environments to average on',  default=4)
     parser.add_argument('--reward_scale', type=float, help='Reward Scaling Multiplier',  default=1.0)
-    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=4000)
+    parser.add_argument('--learning_start', type=int, help='States to wait before learning starts',  default=5000)
+    parser.add_argument('--exploration_noise', type=float, help='Exploration Noise',  default=0.0)
 
     #ALGO SPECIFIC ARGS
     parser.add_argument('--popsize', type=int, help='#Policies in the population',  default=10) #10
@@ -77,7 +83,6 @@ async def main():
         
     #Set seeds
     torch.manual_seed(args.seed); np.random.seed(args.seed); random.seed(args.seed)
-
     debug: bool = args.debug
 
     model_name: Optional[str] = args.model_name
@@ -98,12 +103,14 @@ async def main():
         swarm = None
     else:
         N = args.num_truthful_agents
-        M = N
-        agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
-        # agent_name_list = N * ["SpecialistAgent"]
+        M = args.num_adversarial_agents
+        # agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
+        agent_name_list = N * ["SpecialistDebater"] + M * ["AdversarialAgent"]
+        # agent_name_list = N * ["SpecialistDebater"]
 
-        swarm_name = f"{N}true_{M}adv"
-        # swarm_name = f"{N}specialist"
+        # swarm_name = f"{N}true_{M}adv"
+        swarm_name = f"{N}specialist_{M}adv"
+        # swarm_name = f"{N}specialist_debate"
 
         swarm = Swarm(
             agent_name_list,
@@ -122,6 +129,7 @@ async def main():
 
     dataset_train = MMLUDataset('dev')
     dataset_val = MMLUDataset('val')
+    dataset_test = MMLUDataset('test')
     
     # # build pytorch dataset for GPU efficiency
     # class Dataset(torch.utils.data.Dataset):
@@ -136,6 +144,7 @@ async def main():
         swarm,
         dataset_train,
         dataset_val,
+        dataset_test,
         model_name=model_name,
         enable_tensorboard = mode=='OptimizedSwarm',
         enable_artifacts=True,

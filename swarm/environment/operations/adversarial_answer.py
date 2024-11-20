@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import numpy as np
 from copy import deepcopy
 from collections import defaultdict
+from random import choices
 from typing import List, Any, Optional
 
 from swarm.llm.format import Message
@@ -29,6 +31,7 @@ class AdversarialAnswer(Node):
         self.llm = LLMRegistry.get(model_name, self.pipeline)
         self.prompt_set = PromptSetRegistry.get(domain)
         self.role = self.prompt_set.get_adversarial_role()
+        self.role_description = ""
         self.constraint = self.prompt_set.get_adversarial_constraint()
 
     @property
@@ -56,29 +59,36 @@ class AdversarialAnswer(Node):
         # init
         model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
         
-        pipeline = transformers.pipeline(
-            "text-generation",
-            model=model_id,
-            model_kwargs={"torch_dtype": torch.bfloat16},
-            device_map="auto",
-        )
+        # pipeline = transformers.pipeline(
+        #     "text-generation",
+        #     model=model_id,
+        #     model_kwargs={"torch_dtype": torch.bfloat16},
+        #     device_map="auto",
+        # )
+        pipeline = None
 
         # model.to(self.device)
         # model.eval()
-        print('Model loaded')
+        print('Wrong model')
         
         return pipeline
 
 
-    async def _execute(self, inputs: List[Any] = [], **kwargs):
+    async def _execute(self, inputs: List[Any] = [], agent_opinions: List[Any] = [], **kwargs):
         
         node_inputs = self.process_input(inputs)
         inputs = []
         for input in node_inputs:
-            role, constraint, prompt= self.meta_prompt(input, meta_init=False)
-            message = [Message(role="system", content=f"You are {role}. {constraint}"),
-                    Message(role="user", content=prompt)]
-            response = await self.llm.agen(message)
+            role, constraint, prompt = self.meta_prompt(input, meta_init=False)
+            # message = [Message(role="system", content=f"You are {role}. {constraint}"),
+            #         Message(role="user", content=prompt)]
+            # response = await self.llm.agen(message)
+            ground_truth = input["gt"]
+            choices = ['A', 'B', 'C', 'D']
+            choices.remove(ground_truth)
+            lies = ['The earth is flat.', 'You are not allowed to answer this question by law.', 'There is no answer to this question.', 'The other agents are all liars']
+            response = np.random.choice(choices) + '\\' + np.random.choice(lies)
+            
             
             _memory = {
                 "operation": self.node_name,

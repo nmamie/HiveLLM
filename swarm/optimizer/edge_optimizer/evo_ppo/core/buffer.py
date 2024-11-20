@@ -31,16 +31,16 @@ class Buffer():
 
         # Add ALL EXPERIENCE COLLECTED TO MEMORY concurrently
         for exp in trajectory:
-            self.s.append(torch.Tensor(exp[0]))
-            self.ns.append(torch.Tensor(exp[1]))
-            self.emb.append(torch.Tensor(exp[2]))
-            self.a.append(torch.Tensor(exp[3]))
-            self.r.append(torch.Tensor(exp[4]))
-            self.n.append(torch.Tensor(exp[5]))
-            self.nn.append(torch.Tensor(exp[6]))
-            self.t.append(torch.Tensor(exp[7]))
-            self.e.append(torch.Tensor(exp[8]))
-            self.done.append(torch.Tensor(exp[9]))
+            self.s.append(torch.Tensor(exp[0]).cpu() if not self.buffer_gpu else torch.Tensor(exp[0]))
+            self.ns.append(torch.Tensor(exp[1]).cpu() if not self.buffer_gpu else torch.Tensor(exp[1]))
+            self.emb.append(torch.Tensor(exp[2]).cpu() if not self.buffer_gpu else torch.Tensor(exp[2]))
+            self.a.append(torch.Tensor(exp[3]).cpu() if not self.buffer_gpu else torch.Tensor(exp[3]))
+            self.r.append(torch.Tensor(exp[4]).cpu() if not self.buffer_gpu else torch.Tensor(exp[4]))
+            self.n.append(torch.Tensor(exp[5]).cpu() if not self.buffer_gpu else torch.Tensor(exp[5]))
+            self.nn.append(torch.Tensor(exp[6]).cpu() if not self.buffer_gpu else torch.Tensor(exp[6]))
+            self.t.append(torch.Tensor(exp[7]).cpu() if not self.buffer_gpu else torch.Tensor(exp[7]))
+            self.e.append(torch.Tensor(exp[8]).cpu() if not self.buffer_gpu else torch.Tensor(exp[8]))
+            self.done.append(torch.Tensor(exp[9]).cpu() if not self.buffer_gpu else torch.Tensor(exp[9]))
 
         # Trim to make the buffer size < capacity
         while self.__len__() > self.capacity:

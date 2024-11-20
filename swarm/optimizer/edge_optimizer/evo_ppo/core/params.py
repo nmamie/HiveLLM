@@ -18,6 +18,7 @@ class Parameters:
         self.gpu_id = vars(parser.parse_args())['gpu_id']
         self.model_name = vars(parser.parse_args())['model_name']
         self.num_truthful_agents = vars(parser.parse_args())['num_truthful_agents']
+        self.num_adversarial_agents = vars(parser.parse_args())['num_adversarial_agents']
         self.domain = vars(parser.parse_args())['domain']
         self.num_iterations = vars(parser.parse_args())['num_iterations']
         self.train = vars(parser.parse_args())['train']    
@@ -38,11 +39,13 @@ class Parameters:
         self.hidden_size = vars(parser.parse_args())['hidden_size']
         self.critic_lr = vars(parser.parse_args())['critic_lr']
         self.actor_lr = vars(parser.parse_args())['actor_lr']
+        self.weight_decay = vars(parser.parse_args())['weight_decay']
         self.tau = vars(parser.parse_args())['tau']
         self.gamma = vars(parser.parse_args())['gamma']
         self.reward_scaling = vars(parser.parse_args())['reward_scale']
         self.buffer_size = int(vars(parser.parse_args())['buffer'] * 1000000)
         self.learning_start = vars(parser.parse_args())['learning_start']
+        self.exploration_noise = vars(parser.parse_args())['exploration_noise']
 
         self.pop_size = vars(parser.parse_args())['popsize']
         self.num_test = vars(parser.parse_args())['num_test']

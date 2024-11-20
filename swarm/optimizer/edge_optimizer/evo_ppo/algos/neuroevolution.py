@@ -1,4 +1,5 @@
 import random
+import torch
 import numpy as np
 import math
 import swarm.optimizer.edge_optimizer.evo_ppo.core.utils as utils
@@ -138,54 +139,55 @@ class SSNE:
 		num_params = len(list(gene.parameters()))
 		ssne_probabilities = np.random.uniform(0, 1, num_params) * 2
 
-		for i, param in enumerate(gene.parameters()):  # Mutate each param
+		with torch.no_grad():
+			for i, param in enumerate(gene.parameters()):  # Mutate each param
 
-			# References to the variable keys
-			W = param.data
-			if len(W.shape) == 2:  # Weights, no bias
+				# References to the variable keys
+				W = param.data
+				if len(W.shape) == 2:  # Weights, no bias
 
-				num_weights = W.shape[0] * W.shape[1]
-				ssne_prob = ssne_probabilities[i]
+					num_weights = W.shape[0] * W.shape[1]
+					ssne_prob = ssne_probabilities[i]
 
-				if random.random() < ssne_prob:
-					num_mutations = random.randint(0,
-						int(math.ceil(num_mutation_frac * num_weights)))  # Number of mutation instances
-					for _ in range(num_mutations):
-						ind_dim1 = random.randint(0, W.shape[0]-1)
-						ind_dim2 = random.randint(0, W.shape[-1]-1)
-						random_num = random.random()
+					if random.random() < ssne_prob:
+						num_mutations = random.randint(0,
+							int(math.ceil(num_mutation_frac * num_weights)))  # Number of mutation instances
+						for _ in range(num_mutations):
+							ind_dim1 = random.randint(0, W.shape[0]-1)
+							ind_dim2 = random.randint(0, W.shape[-1]-1)
+							random_num = random.random()
 
-						if random_num < super_mut_prob:  # Super Mutation probability
-							W[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * W[ind_dim1, ind_dim2])
-						elif random_num < reset_prob:  # Reset probability
-							W[ind_dim1, ind_dim2] = random.gauss(0, 0.1)
-						else:  # mutauion even normal
-							W[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * W[ind_dim1, ind_dim2])
+							if random_num < super_mut_prob:  # Super Mutation probability
+								W[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * W[ind_dim1, ind_dim2])
+							elif random_num < reset_prob:  # Reset probability
+								W[ind_dim1, ind_dim2] = random.gauss(0, 0.1)
+							else:  # mutauion even normal
+								W[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * W[ind_dim1, ind_dim2])
 
-						# Regularization hard limit
-						W[ind_dim1, ind_dim2] = self.regularize_weight(W[ind_dim1, ind_dim2],
-																	   self.args.weight_magnitude_limit)
+							# Regularization hard limit
+							W[ind_dim1, ind_dim2] = self.regularize_weight(W[ind_dim1, ind_dim2],
+																		self.args.weight_magnitude_limit)
 
-			elif len(W.shape) == 1:  # Bias or layernorm
-				num_weights = W.shape[0]
-				ssne_prob = ssne_probabilities[i]*0.04 #Low probability of mutation here
+				elif len(W.shape) == 1:  # Bias or layernorm
+					num_weights = W.shape[0]
+					ssne_prob = ssne_probabilities[i]*0.04 #Low probability of mutation here
 
-				if random.random() < ssne_prob:
-					num_mutations = random.randint(0,
-						int(math.ceil(num_mutation_frac * num_weights)))  # Number of mutation instances
-					for _ in range(num_mutations):
-						ind_dim = random.randint(0, W.shape[0]-1)
-						random_num = random.random()
+					if random.random() < ssne_prob:
+						num_mutations = random.randint(0,
+							int(math.ceil(num_mutation_frac * num_weights)))  # Number of mutation instances
+						for _ in range(num_mutations):
+							ind_dim = random.randint(0, W.shape[0]-1)
+							random_num = random.random()
 
-						if random_num < super_mut_prob:  # Super Mutation probability
-							W[ind_dim] += random.gauss(0, super_mut_strength * W[ind_dim])
-						elif random_num < reset_prob:  # Reset probability
-							W[ind_dim] = random.gauss(0, 1)
-						else:  # mutauion even normal
-							W[ind_dim] += random.gauss(0, mut_strength * W[ind_dim])
+							if random_num < super_mut_prob:  # Super Mutation probability
+								W[ind_dim] += random.gauss(0, super_mut_strength * W[ind_dim])
+							elif random_num < reset_prob:  # Reset probability
+								W[ind_dim] = random.gauss(0, 1)
+							else:  # mutauion even normal
+								W[ind_dim] += random.gauss(0, mut_strength * W[ind_dim])
 
-						# Regularization hard limit
-						W[ind_dim] = self.regularize_weight(W[ind_dim], self.args.weight_magnitude_limit)
+							# Regularization hard limit
+							W[ind_dim] = self.regularize_weight(W[ind_dim], self.args.weight_magnitude_limit)
 
 	def reset_genome(self, gene):
 		"""Reset a model's weights in place
@@ -197,8 +199,9 @@ class SSNE:
 				None
 
 		"""
-		for param in (gene.parameters()):
-			param.data.copy_(param.data)
+		with torch.no_grad():
+			for param in (gene.parameters()):
+				param.data.copy_(param.data)
 
 	def epoch(self, gen, pop, fitness_evals, migration):
 
@@ -272,12 +275,5 @@ class SSNE:
 			if net_i not in new_elitists:  # Spare the new elitists
 				if random.random() < self.args.mutation_prob:
 					self.mutate_inplace(pop[net_i])
-
-
-
-
-
-
-
-
-
+     
+		return self.selection_stats

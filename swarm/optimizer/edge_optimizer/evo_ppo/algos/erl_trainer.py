@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 import math
 from typing import Any, Dict, Iterator, List
@@ -32,6 +33,8 @@ class ERL_Trainer:
   
   		#Save best policy
 		self.best_policy = model_constructor.make_model(self.policy_string)
+		self.gen_best_policy = model_constructor.make_model(self.policy_string)
+		self.grad_best_policy = model_constructor.make_model(self.policy_string)
 
 		if self.args.train:
 			#Evolution
@@ -86,7 +89,8 @@ class ERL_Trainer:
 
 			#Trackers
 			self.best_score = -float('inf'); self.gen_frames = 0; self.total_frames = 0; self.test_score = -float('inf'); self.test_std = None
-  
+			self.grad_best_score = -float('inf')
+
 			logger.info("ERL Trainer Initialized")
    
 		else:
@@ -128,7 +132,7 @@ class ERL_Trainer:
 		all_fitness = []; all_eplens = []
 		if self.args.pop_size > 1:
 			for i in range(self.args.pop_size):
-				_, fitness, frames, trajectory, pruned_nodes = self.evo_result_pipes[i][1].recv()
+				_, fitness, frames, pruned_nodes, trajectory = self.evo_result_pipes[i][1].recv()
 
 				all_fitness.append(fitness); all_eplens.append(frames)
 				self.gen_frames+= frames; self.total_frames += frames
@@ -142,26 +146,62 @@ class ERL_Trainer:
 		rollout_fitness = []; rollout_eplens = []
 		if self.args.rollout_size > 0:
 			for i in range(self.args.rollout_size):
-				_, fitness, pg_frames, trajectory, pruned_nodes = self.result_pipes[i][1].recv()
+				_, fitness, pg_frames, pruned_nodes, trajectory = self.result_pipes[i][1].recv()
 				self.replay_buffer.add(trajectory)
 				self.gen_frames += pg_frames; self.total_frames += pg_frames
 				self.best_score = max(self.best_score, fitness)
-				if fitness == self.best_score:
-					self.pruned_nodes = pruned_nodes
+				self.grad_best_score = max(self.grad_best_score, fitness)
+				# if fitness == self.best_score:
+				# 	self.pruned_nodes = pruned_nodes
 				gen_max = max(gen_max, fitness)
 				rollout_fitness.append(fitness); rollout_eplens.append(pg_frames)
+			if max(rollout_fitness) >= self.grad_best_score:
+				champ_index = rollout_fitness.index(max(rollout_fitness))
+				champ = self.rollout_bucket[champ_index]
+				utils.hard_update(self.grad_best_policy, champ)
 
 		######################### END OF PARALLEL ROLLOUTS ################
 
 		############ FIGURE OUT THE CHAMP POLICY AND SYNC IT TO TEST #############
 		if self.args.pop_size > 1:
 			champ_index = all_fitness.index(max(all_fitness))
-			utils.hard_update(self.test_bucket[0], self.population[champ_index])
+			champ = self.population[champ_index]
+			utils.hard_update(self.test_bucket[0], champ)
 			logger.info('Champion fitness:%.2f, Current All-time Champion:%.2f' % (max(all_fitness), self.best_score))
-			# TODO: save best policy here?
+			# safe currently best policy
+			utils.hard_update(self.gen_best_policy, champ)
+			# # Save best policy
+			# if max(all_fitness) >= self.best_score:
+			# 	self.best_score = max(all_fitness)
+			# 	utils.hard_update(self.best_policy, champ)
+			# 	torch.save({
+			# 		'policy': self.best_policy.state_dict(), 
+			# 		# 'init': self._swarm.connection_dist.node_features,
+			# 		# 'state': self._swarm.connection_dist.state_indicator,
+			# 		# 'edges': self._swarm.connection_dist.edge_index,
+			# 		'swarm': self._swarm,				
+			# 		'graph': self._realized_graph,
+			# 		# 'node2idx': self._swarm.connection_dist.node_id2idx,
+			# 		# 'idx2node': self._swarm.connection_dist.node_idx2id,
+			# 		'pruned_nodes': self.pruned_nodes
+			# 	}, self.args.aux_folder + '_best'+self.args.savetag)
+			# 	logger.info('Best policy saved with score:%.2f' % max(all_fitness))
 
 		else: #If there is no population, champion is just the actor from policy gradient learner
 			utils.hard_update(self.test_bucket[0], self.rollout_bucket[0])
+			utils.hard_update(self.best_policy, self.rollout_bucket[0])
+			torch.save({
+					'policy': self.best_policy.state_dict(), 
+					# 'init': self._swarm.connection_dist.node_features,
+					# 'state': self._swarm.connection_dist.state_indicator,
+					# 'edges': self._swarm.connection_dist.edge_index,
+					'swarm': self._swarm,				
+					'graph': self._realized_graph,
+					# 'node2idx': self._swarm.connection_dist.node_id2idx,
+					# 'idx2node': self._swarm.connection_dist.node_idx2id,
+					'pruned_nodes': self.pruned_nodes
+				}, self.args.aux_folder + '_best'+self.args.savetag)
+			logger.info('Best policy saved with score:%.2f' % max(rollout_fitness))
 
 
 		###### TEST SCORE ######
@@ -176,30 +216,33 @@ class ERL_Trainer:
 			test_scores = np.array(test_scores)
 			test_mean = np.mean(test_scores); test_std = (np.std(test_scores))
 			tracker.update([test_mean], self.total_frames)
-
-			# Save best policy
-			if test_mean > self.test_score:
+			if test_mean >= self.test_score:
 				self.test_score = test_mean
 				utils.hard_update(self.best_policy, self.test_bucket[0])
 				torch.save({
 					'policy': self.best_policy.state_dict(), 
-					'init': self._swarm.connection_dist.node_features,
-					'state': self._swarm.connection_dist.state_indicator,
-					'edges': self._swarm.connection_dist.edge_index,
+					# 'init': self._swarm.connection_dist.node_features,
+					# 'state': self._swarm.connection_dist.state_indicator,
+					# 'edges': self._swarm.connection_dist.edge_index,
+					'swarm': self._swarm,				
 					'graph': self._realized_graph,
-					'node2idx': self._swarm.connection_dist.node_id2idx,
-					'idx2node': self._swarm.connection_dist.node_idx2id,
+					# 'node2idx': self._swarm.connection_dist.node_id2idx,
+					# 'idx2node': self._swarm.connection_dist.node_idx2id,
 					'pruned_nodes': self.pruned_nodes
 				}, self.args.aux_folder + '_best'+self.args.savetag)
-				logger.info('Best policy saved with score:%.2f' % self.test_score)
+				logger.info('Best policy saved with score:%.2f' % test_mean)
 
 		else:
 			test_mean, test_std = None, None
-
-
+   
 		#NeuroEvolution's probabilistic selection and recombination step
 		if self.args.pop_size > 1:
-			self.evolver.epoch(gen, self.population, all_fitness, self.rollout_bucket)
+			selection_stats = self.evolver.epoch(gen, self.population, all_fitness, self.rollout_bucket)
+   
+		if selection_stats['total'] > 0:
+			logger.info('Elite Rate:%.2f, Selection Rate:%.2f, Discard Rate:%.2f' % (selection_stats['elite']/selection_stats['total'], (selection_stats['elite']+selection_stats['selected'])/selection_stats['total'], selection_stats['discarded']/selection_stats['total']))
+		else:
+			logger.info('RL transfer not happened yet')
 
 		#Compute the champion's eplen
 		champ_len = all_eplens[all_fitness.index(max(all_fitness))] if self.args.pop_size > 1 else rollout_eplens[rollout_fitness.index(max(rollout_fitness))]
@@ -216,8 +259,29 @@ class ERL_Trainer:
 		for gen in range(1, 1000000000):  # Infinite generations
 
 			# Train one iteration
-			max_fitness, champ_len, all_eplens, test_mean, test_std, rollout_fitness, rollout_eplens = self.forward_generation(gen, test_tracker)
+			try:
+				max_fitness, champ_len, all_eplens, test_mean, test_std, rollout_fitness, rollout_eplens = self.forward_generation(gen, test_tracker)
+			except KeyboardInterrupt:
+				torch.save({
+					'policy': self.gen_best_policy.state_dict(),
+					'swarm': self._swarm,
+					'graph': self._realized_graph,
+					'pruned_nodes': self.pruned_nodes
+				}, self.args.aux_folder + '_gen'+self.args.savetag)
+				torch.save({
+					'policy': self.grad_best_policy.state_dict(), 
+					'swarm': self._swarm,
+					'graph': self._realized_graph,
+					'pruned_nodes': self.pruned_nodes
+				}, self.args.aux_folder + '_grad'+self.args.savetag)
+				print('Model checkpoints saved')
+				print('Exiting...')
+				break
+
 			if test_mean: self.args.writer.add_scalar('test_score', test_mean, gen)
+   
+			# clean up cuda memory
+			torch.cuda.empty_cache()
 
 			print('Gen/Frames:', gen,'/',self.total_frames,
 				  ' Gen_max_score:', '%.2f'%max_fitness,
@@ -229,10 +293,20 @@ class ERL_Trainer:
 				print('Best_score_ever:''/','%.2f'%self.best_score, ' FPS:','%.2f'%(self.total_frames/(time.time()-time_start)), 'savetag', self.args.savetag)
 				print()
 
-			# self._print_conns(torch.sigmoid(self.best_policy.edge_logits), save_to_file=False)
-
 			if self.total_frames > frame_limit:
 				# self._print_conns(torch.sigmoid(self.best_policy.edge_logits), save_to_file=True)
+				torch.save({
+					'policy': self.gen_best_policy.state_dict(),
+					'swarm': self._swarm,
+					'graph': self._realized_graph,
+					'pruned_nodes': self.pruned_nodes
+				}, self.args.aux_folder + '_gen'+self.args.savetag)
+				torch.save({
+					'policy': self.grad_best_policy.state_dict(), 
+					'swarm': self._swarm,
+					'graph': self._realized_graph,
+					'pruned_nodes': self.pruned_nodes
+				}, self.args.aux_folder + '_grad'+self.args.savetag)
 				break
 
 		###Kill all processes
@@ -244,6 +318,7 @@ class ERL_Trainer:
 			None
 	
    
+	@torch.no_grad
 	async def eval(self, val_dataset, limit_questions=None, eval_batch_size=1):
 		"""
 		Evaluate the model on the validation dataset
@@ -255,42 +330,51 @@ class ERL_Trainer:
 		if not self.args.train:             
 			model_state = torch.load(self.args.aux_folder + '_best'+self.args.savetag)
 			self.best_policy.load_state_dict(model_state['policy'])
-			self._swarm.connection_dist.node_features = model_state['init']
-			self._swarm.connection_dist.state_indicator = model_state['state']
-			self._swarm.connection_dist.edge_index = model_state['edges']
+			# self._swarm.connection_dist.node_features = model_state['init']
+			# self._swarm.connection_dist.state_indicator = model_state['state']
+			# self._swarm.connection_dist.edge_index = model_state['edges']
+			self._swarm = model_state['swarm']
 			self._realized_graph = model_state['graph']
-			self._swarm.connection_dist.node_id2idx = model_state['node2idx']
-			self._swarm.connection_dist.node_idx2id = model_state['idx2node']
+			# self._swarm.connection_dist.node_id2idx = model_state['node2idx']
+			# self._swarm.connection_dist.node_idx2id = model_state['idx2node']
 			self.pruned_nodes = model_state['pruned_nodes']
 		self.best_policy.to(self.device)
 		self.best_policy.eval()
 
-		env = self.env_constructor.make_env(test=True, graph=self._realized_graph, node2idx=self._swarm.connection_dist.node_id2idx, idx2node=self._swarm.connection_dist.node_idx2id, node_features=self._swarm.connection_dist.node_features, state_indicator=self._swarm.connection_dist.state_indicator, edge_index=self._swarm.connection_dist.edge_index)
-		env.prune(self.pruned_nodes)
+		env, num_envs = self.env_constructor.make_env(test=True, graph=self._realized_graph, node2idx=self._swarm.connection_dist.node_id2idx, idx2node=self._swarm.connection_dist.node_idx2id, node_features=self._swarm.connection_dist.node_features, state_indicator=self._swarm.connection_dist.state_indicator, edge_index=self._swarm.connection_dist.edge_index)
+		# env.prune(self.pruned_nodes)
 		print(f"Pruned nodes: {self.pruned_nodes}")
 		accuracy = Accuracy()
   
 		progress_bar = tqdm(total=limit_questions)
 		while True:
 			print(80*'-')
-			state, edge_index, active_node_idx, records = await env.val_reset()
-			# remove pruned nodes from edge_index
-			if len(self.pruned_nodes) > 0:
-				for i in range(len(edge_index[0])):
-					if edge_index[0][i] in self.pruned_nodes or edge_index[1][i] in self.pruned_nodes:
-						edge_index[0][i] = -1
-						edge_index[1][i] = -1
-			record, sentence_emb = records[0]
+			state, edge_index, active_node_idx, record = await env.val_reset()
+			print("Active node: ", active_node_idx)
+			# # remove pruned nodes from edge_index
+			# if len(self.pruned_nodes) > 0:
+			# 	edge_index = utils.remove_pruned_nodes(edge_index, self.pruned_nodes)
+			record, sentence_emb = record
 			sentence = record['question']
 			print("Question:", sentence)
 			done = False
+			terminate = False
+			truncate = False
 			steps = 0
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
 				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence_emb, step=steps, pruned_nodes=[])
-				state, active_node_idx, reward, done, final_answers = await env.val_step(action, record, state, edge_index)
+				print("Action:", action)
+				next_state, next_active_node_idx, reward, terminate, truncate, final_answers = await env.val_step(action, record, edge_index)
+				# state_copy = deepcopy(state.cpu().numpy())
+				# next_state_copy = deepcopy(next_state.cpu().numpy())
+				# dist = np.linalg.norm(state_copy - next_state_copy, ord=2, axis=1)
+				# print("State distance:", dist)
+				state = deepcopy(next_state)
+				active_node_idx = deepcopy(next_active_node_idx)
 				steps += 1
+				done = terminate or truncate
 			raw_answer = final_answers[0]
 			print("Raw answer:", raw_answer)
 			answer = val_dataset.postprocess_answer(raw_answer)

@@ -32,7 +32,8 @@ class Evaluator():
             self,
             swarm: Optional[Swarm],
             train_dataset: BaseDataset,
-            val_dataset: BaseDataset,
+            val_dataset: BaseDataset,\
+            test_dataset: BaseDataset,
             model_name: Optional[str] = None,
             enable_tensorboard: bool = False,
             enable_artifacts: bool = False,
@@ -43,6 +44,7 @@ class Evaluator():
         self._swarm: Optional[Swarm] = swarm
         self._train_dataset: BaseDataset = train_dataset
         self._val_dataset: BaseDataset = val_dataset
+        self._test_dataset: BaseDataset = test_dataset
         self._model_name: Optional[str] = model_name
 
         datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -236,9 +238,11 @@ class Evaluator():
 
         train_dataset = self._train_dataset
         val_dataset = self._val_dataset
+        test_dataset = self._test_dataset
 
         print(f"Optimizing swarm on {train_dataset.__class__.__name__} split {train_dataset.split}")
         print(f"Validating on {val_dataset.__class__.__name__} split {val_dataset.split}")
+        print(f"Testing on {test_dataset.__class__.__name__} split {test_dataset.split}")
         
         # num_params = sum(p.numel() for p in self._swarm.connection_dist.parameters() if p.requires_grad)
         # params = [p for p in self._swarm.connection_dist.parameters() if p.requires_grad]
@@ -284,7 +288,7 @@ class Evaluator():
         potential_connections = self._swarm.connection_dist.potential_connections
         
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(self._swarm, realized_graph, bert, tokenizer, train_dataset, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
+        env_constructor = EnvConstructor(self._swarm, realized_graph, bert, tokenizer, train_dataset, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs, self.args.exploration_noise)
         
         # if self.args.train:
         #     train_env_constructor = EnvConstructor(realized_graph, train_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)
@@ -302,5 +306,5 @@ class Evaluator():
         # training or evaluation
         if self.args.train:
             ai.train(self.args.total_steps)
-        score = await ai.eval(val_dataset, limit_questions=153)
+        score = await ai.eval(test_dataset, limit_questions=153)
         return score

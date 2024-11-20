@@ -75,9 +75,9 @@ def hard_update(target, source):
             None
     """
 
-    for target_param, param in zip(target.parameters(), source.parameters()):
-
-        target_param.data.copy_(param.data)
+    with torch.no_grad():
+        for target_param, param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(param.data)
 
 
 def soft_update(target, source, tau):
@@ -93,8 +93,9 @@ def soft_update(target, source, tau):
 
     """
 
-    for target_param, param in zip(target.parameters(), source.parameters()):
-        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
+    with torch.no_grad():
+        for target_param, param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 
 def to_numpy(var):
@@ -261,7 +262,23 @@ def load_all_models_dir(dir, model_template):
     return models
 
 
+def remove_pruned_nodes(edge_index, pruned_nodes):
+    """Remove pruned nodes from the graph
 
+        Parameters:
+            edge_index (tensor): edge index
+            pruned_nodes (list): list of pruned nodes
+
+        Returns:
+            edge_index (tensor): edge index
+    """
+
+    device = edge_index.device
+    edge_index = edge_index.t().cpu().numpy()
+    edge_index = [edge for edge in edge_index if edge[0] not in pruned_nodes and edge[1] not in pruned_nodes]
+    edge_index = np.array(edge_index).T
+    edge_index = torch.tensor(edge_index, dtype=torch.long).to(device)
+    return edge_index
 
 
 

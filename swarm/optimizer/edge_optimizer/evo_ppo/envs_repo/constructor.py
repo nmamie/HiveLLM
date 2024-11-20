@@ -8,7 +8,7 @@ class EnvConstructor:
 
 
     """
-    def __init__(self, swarm, graph, bert, tokenizer, train_dataset, val_dataset, train, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs):
+    def __init__(self, swarm, graph, bert, tokenizer, train_dataset, val_dataset, train, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs, exploration_noise):
         """
         A general Environment Constructor
         """
@@ -32,6 +32,7 @@ class EnvConstructor:
         self.idx2node = idx2node
         self.edge_index = edge_index
         self.num_envs = num_envs
+        self.exploration_noise = exploration_noise
         
         #State and Action Parameters
         self.state_dim = self.num_node_features
@@ -61,5 +62,5 @@ class EnvConstructor:
         if edge_index is not None:
             self.edge_index = edge_index
             
-        env = GymWrapper(self.swarm, self.graph, self.bert, self.tokenizer, self.train_dataset, self.val_dataset, self.train, test, self.num_pot_edges, self.num_nodes, self.num_node_features, self.node_features, self.state_indicator, self.node2idx, self.idx2node, self.edge_index, self.batch_size, self.num_envs)
-        return env
+        env = GymWrapper(self.swarm, self.graph, self.bert, self.tokenizer, self.train_dataset, self.val_dataset, self.train, test, self.num_pot_edges, self.num_nodes, self.num_node_features, self.node_features, self.state_indicator, self.node2idx, self.idx2node, self.edge_index, self.batch_size, self.num_envs, self.exploration_noise)
+        return env, self.num_envs

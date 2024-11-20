@@ -43,6 +43,7 @@ class FinalDecision(Node):
         self.llm: LLM = LLMRegistry.get(model_name, self.pipeline)
         self.prompt_set: PromptSet = PromptSetRegistry.get(domain)
         self.role: str = self.prompt_set.get_role()
+        self.role_description: str = "Refer to all answers and give a final answer."
         self.constraint: str = self.prompt_set.get_constraint()
 
     @property
@@ -94,7 +95,7 @@ class FinalDecision(Node):
         
         return pipeline
 
-    async def _execute(self, inputs: List[Any] = [], 
+    async def _execute(self, inputs: List[Any] = [], agent_opinions: List[Any] = None,
                        **kwargs) -> None:
 
         node_inputs = self.process_input(inputs)
@@ -111,12 +112,12 @@ class FinalDecision(Node):
 
         elif self.strategy == MergingStrategy.MajorityVote:
             if len(inputs) == 0:
-                # inputs = [{"output": "No answers provided.", "task": "No task provided.", "files": "No files provided."}]
                 raise Exception("No inputs is not supported for MajorityVote")
             answers = [input.get("output") for input in inputs]
             counter = Counter(answers)
             sorted_counter = counter.most_common()
             max_freq = sorted_counter[0][1]
+            confidence = max_freq / len(answers)
             equally_frequent_answers = [ans for ans, freq in sorted_counter if freq == max_freq]
             response = random.choice(equally_frequent_answers)
             # print(f"{answers=} {response=}")
@@ -166,6 +167,7 @@ class FinalDecision(Node):
                         "input": inputs, 
                         "subtask": prompt,
                         "output": response,
+                        "confidence": confidence if self.strategy == MergingStrategy.MajorityVote else None,
                         "format": "natural language"}
 
         self.memory.add(self.id, executions)

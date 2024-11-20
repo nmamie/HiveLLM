@@ -52,6 +52,7 @@ class Node(ABC):
         self.id = id if id is not None else shortuuid.ShortUUID().random(length=4)
         self.memory = GlobalMemory.instance()
         self.operation_description = operation_description
+        self.opinions: List[Any] = []
         self.predecessors: List[Node] = []
         self.successors: List[Node] = []
         self.inputs: List[Any] = []
@@ -101,13 +102,14 @@ class Node(ABC):
                 raise ValueError("Input must be provided either directly or from predecessors.")
             
         elif not isinstance(inputs, list):
-
             inputs = [inputs]
-
+            # if self.opinions is not None:
+            #     for opinion in self.opinions:
+            #         inputs.append({'task': None, 'operation': self.node_name, 'output': opinion})
         return inputs
 
-    async def execute(self, **kwargs):
-
+    async def execute(self, agent_opinions: List[Any] = None, gt="", **kwargs):
+        agent_opinions = agent_opinions if agent_opinions is not None else []
         self.outputs = []
         tasks = []
         if not self.inputs and self.predecessors:
@@ -117,15 +119,17 @@ class Node(ABC):
                     predecessor_outputs = predecessor.outputs
                     if predecessor_outputs is not None and isinstance(predecessor_outputs, list):
                         combined_inputs.extend(predecessor_outputs)
-                tasks.append(asyncio.create_task(self._execute(combined_inputs, **kwargs)))
+                tasks.append(asyncio.create_task(self._execute(combined_inputs, agent_opinions, **kwargs)))
             else:
                 for predecessor in self.predecessors:
                     predecessor_outputs = predecessor.outputs
                     if isinstance(predecessor_outputs, list) and predecessor_outputs:
                         for predecessor_output in predecessor_outputs:
-                            tasks.append(asyncio.create_task(self._execute(predecessor_output, **kwargs)))
+                            tasks.append(asyncio.create_task(self._execute(predecessor_output, agent_opinions, **kwargs)))
         elif self.inputs:
-            tasks = [asyncio.create_task(self._execute(input, **kwargs)) for input in self.inputs]
+            for input in self.inputs:
+                input['gt'] = gt
+            tasks = [asyncio.create_task(self._execute(input, agent_opinions, **kwargs)) for input in self.inputs]
         else:
             warnings.warn("No input received.")
             return
@@ -141,7 +145,7 @@ class Node(ABC):
                     logger.error(f"Node {type(self).__name__} failed to execute due to: {result.__class__.__name__}: {result}")
 
     @abstractmethod
-    async def _execute(self, input, **kwargs):
+    async def _execute(self, input, agent_opinions, **kwargs):
         """ To be overriden by the descendant class """
 
     def log(self):
@@ -158,4 +162,3 @@ class Node(ABC):
             f"\033[1;34m{key}\033[0m: {value}" for key, value in last_item.items() if key not in ignore_keys)
         formatted_output = f"Memory Records for ID \033[1;35m{self.id}\033[0m:\n    {formatted_items}"
         # logger.info(formatted_output)
-

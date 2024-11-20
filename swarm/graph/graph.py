@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from calendar import c
 import shortuuid
 from typing import Any, List, Optional, Dict, Tuple
 from copy import deepcopy
@@ -63,6 +64,7 @@ class Graph(ABC):
         self.current_node_id = None
         self.start_node_id = None
         self.pruned_nodes = []
+        self.visited_nodes = {}
         self.num_steps = 0
         self.build_graph()
 
@@ -213,24 +215,30 @@ class Graph(ABC):
         in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in useful_node_ids}
         # out_degree = {node_id: len(self.nodes[node_id].successors) for node_id in self.useful_node_ids}
         zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
-        potential_start_nodes = [node_id for node_id in useful_node_ids if self.nodes[node_id].successors and node2idx[node_id] not in pruned_nodes]
+        potential_start_nodes = [node_id for node_id in useful_node_ids if self.nodes[node_id].successors and self.nodes[node_id].node_name != "AdversarialAnswer"]
         
         self.start_node_id = np.random.choice(potential_start_nodes)
         
         current_node_id = self.start_node_id
+                
+        if current_node_id not in self.visited_nodes.keys():
+            self.visited_nodes[current_node_id] = 1
+        else:
+            self.visited_nodes[current_node_id] += 1
         
         # current_node = self.nodes[current_node_id]
-                
-        self.state = node_features
+        if self.state is None:        
+            self.state = node_features
+        state = deepcopy(self.state)
+        
         self.current_node_id = current_node_id
         self.num_steps = 0
                 
-        return self.state, current_node_id
+        return state, current_node_id
     
     
     async def step(self, dataset: List[Dict[str, Any]],
                       record: Dict[str, Any],
-                      state: torch.Tensor,
                       edge_index: torch.Tensor,
                   max_tries: int = 3, 
                   max_time: int = 600, 
@@ -239,7 +247,7 @@ class Graph(ABC):
                   node_features: Optional[torch.Tensor] = None,
                   node2idx: Optional[Dict[str, int]] = None,
                   action: Optional[int] = None,
-                  inference: bool = False) -> List[Any]:
+                  inference: bool = False) -> Tuple[torch.Tensor, float, bool, bool, List[Any], str, torch.Tensor]:
  
         def is_node_useful(node):
             if node in self.output_nodes:
@@ -250,11 +258,15 @@ class Graph(ABC):
                     return True
             return False
         
+        # termination
+        terminate = False
+        truncate = False
+        
         inputs = dataset.record_to_swarm_input(record)
         correct_answer = dataset.record_to_target_answer(record)
         
         for i, input_node in enumerate(self.input_nodes):
-            node_input = deepcopy(inputs)
+            node_input = inputs
             input_node.inputs = [node_input]
         
         final_answers = []
@@ -265,10 +277,11 @@ class Graph(ABC):
         # for first step
         if self.num_steps == 0:
             current_node = self.nodes[self.start_node_id]
+            current_node.opinions = None
             tries = 0
             while tries < max_tries:
                 try:
-                    await asyncio.wait_for(current_node.execute(), timeout=max_time)
+                    await asyncio.wait_for(current_node.execute(gt=correct_answer), timeout=max_time)
                     break
                 except asyncio.TimeoutError:
                     print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
@@ -278,43 +291,60 @@ class Graph(ABC):
                     # reward -= 100
                     break
                 tries += 1
+                
+            # # check answer of current node to get reward
+            # current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
+            # current_answer_post = dataset.postprocess_answer(current_answer)
+            # if current_answer_post == correct_answer:
+            #     reward1 = 0
+            # else:
+            #     reward1 = -0.1
+                
+        # prev_node_id = self.current_node_id
+        
+        # # punish for jumping to the same node
+        # if prev_node_id == current_node_id:
+        #     reward -= 10
         
         # add state diff to node features
-        next_state = self.state
+        next_state = deepcopy(self.state)
+        
+        # termination due to many steps (prevent infinite loop, equivalent to truncate)
+        if self.num_steps > self.num_edges:
+            terminate = True
+            reward -= 5 # punish for too many steps
+            final_node = None
+            for node in self.nodes.values():
+                if node.node_name == "FinalDecision":
+                    final_node = node
+                    current_node_id = final_node.id
+                    break
+
         self.current_node_id = current_node_id
+        
+        # if current_node_id not in self.visited_nodes.keys():
+        #     self.visited_nodes[current_node_id] = 1
+        # else:
+        #     self.visited_nodes[current_node_id] += 1
+        # self.nodes[self.current_node_id].opinions = [node.outputs[-1] for node in self.nodes.values() if len(node.outputs) > 0]
         
         # step counter
         self.num_steps += 1
         
-        # # policy step
-        # edge_index = []
-        # current_node = self.nodes[current_node_id]
-        # for successor in current_node.successors:
-        #     if successor.id in self.useful_node_ids:
-        #         edge_index.append([node2idx[current_node_id], node2idx[successor.id]])
-        # edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+        # # ensure that nodes in visited_nodes are equally distributed else punish
+        # if len(self.visited_nodes) > 1:
+        #     if self.visited_nodes[current_node_id] > 2 * np.mean(list(self.visited_nodes.values())):
+        #         reward -= 10
+        
         current_node = self.nodes[current_node_id]
         if not current_node.successors:
             terminate = True
-        else: 
-            terminate = False
-        # else:
-        #     state = node_features[node2idx[current_node_id]]
-        #     _, node_features, attention = policy(node_features, edge_index)
-        # # find highest attention node from the successors
-        # max_attention = 0
-        # for successor in current_node.successors:
-        #     if successor.id in useful_node_ids:
-        #         if attention[node2idx[successor.id]] > max_attention:
-        #             max_attention = attention[node2idx[successor.id]]
-        #             current_node_id = successor.id # action is to move to the node with highest attention
-        # action = torch.tensor([node2idx[current_node_id]], dtype=torch.long)
-        # next_state = node_features[node2idx[current_node_id]]
-        
+
         tries = 0
         while tries < max_tries:
             try:
-                await asyncio.wait_for(current_node.execute(), timeout=max_time)
+                node_outputs = [node.outputs[-1] for node in self.nodes.values() if len(node.outputs) > 0]
+                await asyncio.wait_for(current_node.execute(node_outputs, gt=correct_answer), timeout=max_time)
                 break
             except asyncio.TimeoutError:
                 print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")
@@ -324,83 +354,66 @@ class Graph(ABC):
                 # reward -= 100
                 break
             tries += 1
-            if tries == max_tries:
-                reward -= 0
+            # if tries == max_tries:
+            #     reward -= 0
 
         # for successor in current_node.successors:
         #     if successor.id in useful_node_ids:
         #         in_degree[successor.id] -= 1
         #         if in_degree[successor.id] == 0:
         #             zero_in_degree_queue.append(successor.id)
-
+        
+        
     
         if terminate:
             output_messages = current_node.outputs
+            
+            confidence = output_messages[-1].get("confidence", output_messages[-1])
             
             if len(output_messages) > 0:
                 final_answer = output_messages[-1].get("output", output_messages[-1])
                 final_answer_post = dataset.postprocess_answer(final_answer)
                 final_answers.append(final_answer)
                 if final_answer_post == correct_answer:
-                    # if self.num_steps <= self.num_nodes * 4:
-                    reward += 100
-            #     else:
-            #         reward -= 0
-            # else:
-            #     reward -= 0
-            
-            # if len(output_messages) > 0 and not return_all_outputs:
-            #     final_answer = output_messages[-1].get("output", output_messages[-1])
-            #     final_answer_post = dataset.postprocess_answer(final_answer)
-            #     if final_answer_post == correct_answer:
-            #         reward = 100
-            #     else:
-            #         reward = -100
-            # elif len(output_messages) > 0:
-            #     reward = 0
-            #     for output_message in output_messages:
-            #         final_answer = output_message.get("output", output_message)
-            #         final_answers.append(final_answer)
-            #         final_answer_post = dataset.postprocess_answer(final_answer)
-            #         if final_answer_post == correct_answer:
-            #             reward += 100
-            #         else:
-            #             reward -= 100
-                        
-            # else:
-            #     reward -= 100
+                    # if self.num_steps > 1:
+                    reward += 10
+                    # else:
+                    #     reward -= 1
+                else:
+                    reward -= confidence * 10
+            else:
+                reward -= confidence * 10
                         
         else:
             # check answer of current node to get reward
             current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
             current_answer_post = dataset.postprocess_answer(current_answer)
-            if current_answer_post == correct_answer:
-                reward -= 0
-            else:
-                reward -= 5
-            
-            # --- TRUNCATE EPISODE ---
-            if self.num_steps > self.num_nodes * 2: #TODO: adapt the threshold
-                terminate = True # truncate episode
-        
+            # if current_answer_post == correct_answer:
+            #     reward += 2
+            if current_answer_post != correct_answer:
+                reward -= 0.1
+            # if self.num_steps > self.num_edges:
+            #     truncate = True # truncate episode
+            #     reward -= 10
         # if self.num_steps % (self.num_nodes * 4) == 0:
         #     reward -= 20
         
         if len(final_answers) == 0:
             final_answers.append("No answer since there are no inputs provided")
             
-        if terminate:
+        if terminate or truncate:
             self.num_steps = 0
+            self.visited_nodes = {}
             # reset all nodes
             for node in self.nodes.values():
                 if len(node.inputs) > 0:
                     node.inputs = []
                 if len(node.outputs) > 0:
                     node.outputs = []
-            # reset to start node
-            current_node_id = self.start_node_id
+            # # reset to start node
+            # current_node_id = self.start_node_id
             
-        return next_state, reward, terminate, final_answers, current_node_id, edge_index
+        return next_state, reward, terminate, truncate, final_answers, current_node_id, edge_index
             
 
     def find_node(self, id: str):

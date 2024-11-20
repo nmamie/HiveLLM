@@ -102,25 +102,32 @@ from accelerate import Accelerator
 # device = 3
 # model.to("cuda:{}".format(device))
 # tokenizer = AutoTokenizer.from_pretrained("OuteAI/Lite-Oute-2-Mamba2Attn-Instruct")
-model = None
+llama_model = None
+# other_model = None
 curr_inf = False
 
-def load_model(inference: bool = False):
+def load_model(inference: bool = False, model_id: str = ""):
     if inference is True:
         model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
     # else: model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    else: model_id = "meta-llama/Llama-3.2-3B-Instruct"
-    # else: model_id = "ministral/Ministral-3b-instruct"
-
+    # else: model_id = "meta-llama/Llama-3.2-3B-Instruct"
+    else: 
+        # if model_id == "llama":
+        #     model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        # else:
+        #     model_id = "microsoft/Phi-3.5-mini-instruct"
+        model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
+    
     hf_pipeline = transformers.pipeline(
-            "text-generation",
-            model=model_id,
-            model_kwargs={
-                "torch_dtype": torch.bfloat16,
-                        },
-            # trust_remote_code=True,
-            device_map="auto",
-        )
+        "text-generation",
+        model=model_id,
+        model_kwargs={
+            "torch_dtype": torch.bfloat16,
+                    },
+        # trust_remote_code=True,
+        device_map="auto",
+    )
 
     accelerator = Accelerator()
     model = accelerator.prepare(hf_pipeline)
@@ -188,13 +195,14 @@ def hugging_chat(
 async def hugging_achat(
     model_name,
     messages: List[str],
-    max_tokens: int = 30,
+    max_tokens: int = 64,
     temperature: float = 0.0,
     inference: bool = False,
     num_comps=1,
     return_cost=False,
 ) -> Union[List[str], bool]:
-    global model
+    global llama_model
+    # global other_model
     global curr_inf
     if messages[0] == '$skip$':
         return ''
@@ -207,9 +215,12 @@ async def hugging_achat(
     #     formatted_messages, add_generation_prompt=True, return_tensors="pt"
     # ).to(device)
     
-    if model is None or curr_inf != inference:
-        model = load_model(inference=inference)
+    if llama_model is None or curr_inf != inference:
+        llama_model = load_model(inference=inference, model_id="llama")
         curr_inf = inference
+    
+    # if other_model is None:
+    #     other_model = load_model(inference=inference, model_id="")
     
     if temperature > 0.0:
         do_sample = True
@@ -221,7 +232,14 @@ async def hugging_achat(
         temperature = None
         repetition_penalty = None
             
-    assert model is not None, "Model not loaded"
+    assert llama_model is not None, "LLama model not loaded"
+    # assert other_model is not None, "Other model not loaded"
+    
+    # if model_name in ["Mathematician", "Logical Reasoner", "Fact Checker", "Philosopher", "Data Analyst", "Context Interpreter", "Critical Thinker", "Strategist", "Educator", "Linguist", "Ethicist", "Interdisciplinary Synthesizer", "Memory Retriever", "Trend Analyzer", "Legal Analyst"]:
+    #     model = llama_model
+    # else:
+    #     model = other_model
+    model = llama_model
 
     try:
         with async_timeout.timeout(20):
@@ -243,13 +261,15 @@ async def hugging_achat(
         print(f"Error: {e}")
         raise e
     
-    answer = response[0]["generated_text"][-1]['content']
-    model_name = "inference" #TODO
+    # answer = response[0]["generated_text"][-1]['content']
+    # model_name = "inference" #TODO
         
     if num_comps == 1:
         # cost_count(response, model_name, float(len_messages), float(len(answer))) #TODO
         # print(f"Answer: {answer}")
         return response[0]["generated_text"][-1]['content']
+    
+    torch.cuda.empty_cache()
 
     # cost_count(response, model_name, len_messages, len(answer))
 
