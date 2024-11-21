@@ -23,60 +23,24 @@ Make the list as diverse as possible so that you expect them to answer the same 
 """
 
 
-class SpecialistDebate(Node):
+class ModeratorDebate(Node):
     role_list = [
         {
-            "role": "Interdisciplinary Synthesizer",
-            "description": "Integrate knowledge across fields to provide a comprehensive answer. Encourage other roles to consider interdisciplinary perspectives and avoid overly narrow conclusions."
-        },
-        {
-            "role": "Critical Thinker",
-            "description": "Approach questions with skepticism and challenge assumptions rigorously. Question the validity and soundness of other responses, encouraging a critical examination of all conclusions."
-        },
-        {
-            "role": "Scientist",
-            "description": "You are a scientist with expertise in empirical research and experimentation. Provide answers based on scientific evidence and encourage other roles to consider empirical data."
-        },
-        {
-            "role": "Educator",
-            "description": "You are an educator with expertise in explaining complex ideas in simple terms. Encourage other roles to be clear in their answers, helping the overall response be more understandable."
-        },
-        {
-            "role": "Mathematician",
-            "description": "You are a mathematician with expertise in solving complex mathematical problems. Approach questions with mathematical rigor and precision, and encourage rigorous validation from other roles."
-        },
-        {
-            "role": "Fact Checker",
-            "description": "You are a meticulous fact-checker. Verify the correctness of other agents' answers and challenge any inaccuracies or unsupported claims."
-        },
-        {
-            "role": "Philosopher",
-            "description": "You are a philosopher skilled in analyzing abstract concepts. Provide responses by considering various philosophical frameworks, and encourage other roles to think beyond the surface level."
-        },
-        {
-            "role": "Psychologist",
-            "description": "You are a psychologist with expertise in human behavior and mental processes. Provide answers based on psychological theories and encourage other roles to consider human psychology."
-        },
-        {
-            "role": "Engineer",
-            "description": "You are an engineer with expertise in designing and building systems. Provide practical solutions to problems and encourage other roles to consider engineering principles."
-        },
-        {
-            "role": "Trend Analyzer",
-            "description": "Identify patterns and trends, using historical and current data to predict outcomes. Encourage other roles to consider the likelihood of outcomes based on trend data."
+            "role": "Moderator",
+            "description": "You are a moderator who ensures a balanced and fair discussion. Encourage all agents to participate and maintain order in the debate, like a neutral and central manager."
         }
     ]
 
     def __init__(self,
                  domain: str,
                  model_name: Optional[str],
-                 operation_description: str = "Answer as if you were a specialist in <something> taking part in a debate.",
+                 operation_description: str = "Answer as if you were the moderator in a debate of several agents in a swarm.",
                  max_token: int = 64,
                  id=None):
         super().__init__(operation_description, id, True)
         self.domain = domain
         self.model_name = model_name
-        # Override role with a specialist role and fetch role description.
+         # Override role with a specialist role and fetch role description.
         idx_role = hash(self.id) % len(self.role_list)
         # idx_role = np.random.randint(0, len(self.role_list))
         self.role_info = self.role_list[idx_role]
@@ -86,6 +50,7 @@ class SpecialistDebate(Node):
         self.llm = LLMRegistry.get(self.role)
         self.max_token = max_token
         self.prompt_set = PromptSetRegistry.get(domain)
+
 
         print(f"Creating a node with specialization {self.role}")
 
@@ -101,8 +66,7 @@ class SpecialistDebate(Node):
 
         if meta_optimize:
             update_role = role
-            node_optimizer = MetaPromptOptimizer(
-                self.model_name, self.node_name)
+            node_optimizer = MetaPromptOptimizer(self.model_name, self.node_name)
             update_constraint = await node_optimizer.generate(constraint, task)
             return update_role, update_constraint
 
@@ -114,9 +78,9 @@ class SpecialistDebate(Node):
         task: Optional[str] = None
         additional_knowledge: List[str] = []
         for input in node_inputs:
-            if len(input) <= 2 and 'task' in input:  # Swarm input
+            if len(input) <= 2 and 'task' in input: # Swarm input
                 task = input['task']
-            else:  # All other incoming edges
+            else: # All other incoming edges
                 extra_knowledge = f"Opinion of {input['operation']} is {input['output']}."
                 # extra_knowledge = f"Opinion of the previous agent in the swarm is {input['output']}."
                 additional_knowledge.append(extra_knowledge)
@@ -129,8 +93,7 @@ class SpecialistDebate(Node):
             additional_knowledge.append(extra_knowledge)
 
         if task is None:
-            raise ValueError(
-                f"{self.__class__.__name__} expects swarm input among inputs")
+            raise ValueError(f"{self.__class__.__name__} expects swarm input among inputs")
 
         opinions = ""
         if len(additional_knowledge) > 0:

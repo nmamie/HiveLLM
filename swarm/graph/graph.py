@@ -300,7 +300,7 @@ class Graph(ABC):
             # else:
             #     reward1 = -0.1
                 
-        # prev_node_id = self.current_node_id
+        prev_node_id = self.current_node_id
         
         # # punish for jumping to the same node
         # if prev_node_id == current_node_id:
@@ -316,7 +316,7 @@ class Graph(ABC):
             final_node = None
             for node in self.nodes.values():
                 if node.node_name == "FinalDecision":
-                    final_node = node
+                    final_node = node # move to final node, terminating the episode
                     current_node_id = final_node.id
                     break
 
@@ -344,6 +344,10 @@ class Graph(ABC):
         while tries < max_tries:
             try:
                 node_outputs = [node.outputs[-1] for node in self.nodes.values() if len(node.outputs) > 0]
+                # if prev_node_id is not None:
+                #     node_outputs = [self.nodes[prev_node_id].outputs[-1]]
+                # else:
+                #     node_outputs = []
                 await asyncio.wait_for(current_node.execute(node_outputs, gt=correct_answer), timeout=max_time)
                 break
             except asyncio.TimeoutError:
@@ -374,7 +378,7 @@ class Graph(ABC):
                 final_answer = output_messages[-1].get("output", output_messages[-1])
                 final_answer_post = dataset.postprocess_answer(final_answer)
                 final_answers.append(final_answer)
-                if final_answer_post == correct_answer:
+                if final_answer_post.lower() == correct_answer.lower():
                     # if self.num_steps > 1:
                     reward += 10
                     # else:
@@ -390,7 +394,7 @@ class Graph(ABC):
             current_answer_post = dataset.postprocess_answer(current_answer)
             # if current_answer_post == correct_answer:
             #     reward += 2
-            if current_answer_post != correct_answer:
+            if current_answer_post.lower() != correct_answer.lower():
                 reward -= 0.1
             # if self.num_steps > self.num_edges:
             #     truncate = True # truncate episode

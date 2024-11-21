@@ -5,7 +5,7 @@ class Accuracy:
         self._num_total = 0
     
     def update(self, predicted: str, target: str) -> None:
-        is_correct = predicted == target
+        is_correct = predicted.lower() == target.lower()
         self._num_correct += int(is_correct)
         self._num_total += 1
 

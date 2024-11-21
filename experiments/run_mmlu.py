@@ -105,6 +105,7 @@ async def main():
         N = args.num_truthful_agents
         M = args.num_adversarial_agents
         # agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
+        # agent_name_list = ["ModeratorDebater"] +  N * ["SpecialistDebater"] + M * ["AdversarialAgent"]
         agent_name_list = N * ["SpecialistDebater"] + M * ["AdversarialAgent"]
         # agent_name_list = N * ["SpecialistDebater"]
 
