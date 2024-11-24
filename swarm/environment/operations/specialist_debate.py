@@ -154,7 +154,7 @@ Take into account the following opinions which may or may not be true:
 
         message = [Message(role="system", content=system_message),
                    Message(role="user", content=user_message)]
-        response = await self.llm.agen(message, max_tokens=self.max_token)
+        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
 
         execution = {
             "operation": self.node_name,

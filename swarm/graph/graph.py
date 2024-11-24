@@ -325,7 +325,7 @@ class Graph(ABC):
         # if current_node_id not in self.visited_nodes.keys():
         #     self.visited_nodes[current_node_id] = 1
         # else:
-        #     self.visited_nodes[current_node_id] += 1
+        #     self.visited_nodes[curPrent_node_id] += 1
         # self.nodes[self.current_node_id].opinions = [node.outputs[-1] for node in self.nodes.values() if len(node.outputs) > 0]
         
         # step counter
@@ -388,14 +388,14 @@ class Graph(ABC):
             else:
                 reward -= confidence * 10
                         
-        else:
-            # check answer of current node to get reward
-            current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
-            current_answer_post = dataset.postprocess_answer(current_answer)
+        # else:
+            # # check answer of current node to get reward
+            # current_answer = current_node.outputs[-1].get("output", current_node.outputs[-1])
+            # current_answer_post = dataset.postprocess_answer(current_answer)
             # if current_answer_post == correct_answer:
             #     reward += 2
-            if current_answer_post.lower() != correct_answer.lower():
-                reward -= 0.1
+            # if current_answer_post.lower() != correct_answer.lower():
+            #     reward -= 0.1
             # if self.num_steps > self.num_edges:
             #     truncate = True # truncate episode
             #     reward -= 10

@@ -117,7 +117,7 @@ def load_model(inference: bool = False, model_id: str = ""):
         # else:
         #     model_id = "microsoft/Phi-3.5-mini-instruct"
         model_id = "meta-llama/Llama-3.2-3B-Instruct"
-        # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
+        # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     
     hf_pipeline = transformers.pipeline(
         "text-generation",
