@@ -27,6 +27,7 @@ class Evaluator():
             swarm: Optional[Swarm],
             train_dataset: BaseDataset,
             val_dataset: BaseDataset,
+            test_dataset: BaseDataset = None,
             model_name: Optional[str] = None,
             enable_tensorboard: bool = False,
             enable_artifacts: bool = False,
@@ -36,6 +37,7 @@ class Evaluator():
         self._swarm: Optional[Swarm] = swarm
         self._train_dataset: BaseDataset = train_dataset
         self._val_dataset: BaseDataset = val_dataset
+        self._test_dataset: Optional[BaseDataset] = test_dataset
         self._model_name: Optional[str] = model_name
 
         datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -54,25 +56,35 @@ class Evaluator():
             self._logger = None
             
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+    def _infinite_data_loader(self, dataset) -> Iterator[pd.DataFrame]:
+            perm = np.random.permutation(len(dataset))
+            while True:
+                for idx in perm:
+                    record = dataset[idx.item()]
+                    yield record
 
     async def evaluate_direct_answer(self,
             limit_questions: Optional[int] = None,
             ) -> float:
 
-        dataset = self._val_dataset
+        dataset = self._test_dataset
         
         print(f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
 
         io_agent = IO(dataset.get_domain(), self._model_name)
 
         accuracy = Accuracy()
-
-        for i_question, record in tqdm(enumerate(dataset)):
+        
+        test_split = self._infinite_data_loader(dataset)
+           
+        
+        for i_question, record in tqdm(enumerate(test_split)):
             print(80*'-')
             if limit_questions is not None:
                 if i_question >= limit_questions:
                     break
-
+                
             input_dict = dataset.record_to_swarm_input(record)
             print(input_dict)
 

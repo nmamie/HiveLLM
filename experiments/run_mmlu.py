@@ -2,6 +2,10 @@ import asyncio
 from typing import Union, Literal, Optional
 import argparse
 
+import numpy as np
+import torch
+import random
+
 from swarm.graph.swarm import Swarm
 from swarm.environment.operations.final_decision import MergingStrategy
 from experiments.evaluator.evaluator_ga import Evaluator
@@ -21,6 +25,9 @@ def parse_args():
 
     parser.add_argument('--num-iterations', type=int, default=30,
                         help="Number of optimization iterations. Default 30.")
+    
+    parser.add_argument('--seed', type=int, default=42,
+                        help="Random seed for reproducibility. Default 42.")
 
     parser.add_argument('--model_name', type=str, default="inference",
                         help="Model name, None runs the default ChatGPT4. Custom runs HF model. Inference runs the Meta-LLama-3.1-8B-Instruct model.")
@@ -38,6 +45,8 @@ def parse_args():
 async def main():
 
     args = parse_args()
+    
+    np.random.seed(args.seed); torch.manual_seed(args.seed); random.seed(args.seed)
 
     debug: bool = args.debug
 
@@ -83,6 +92,7 @@ async def main():
 
     dataset_train = MMLUDataset('dev')
     dataset_val = MMLUDataset('val')
+    dataset_test = MMLUDataset('test')
     
     # # build pytorch dataset for GPU efficiency
     # class Dataset(torch.utils.data.Dataset):
@@ -97,6 +107,7 @@ async def main():
         swarm,
         dataset_train,
         dataset_val,
+        dataset_test,
         model_name=model_name,
         enable_tensorboard = mode=='OptimizedSwarm',
         enable_artifacts=True,

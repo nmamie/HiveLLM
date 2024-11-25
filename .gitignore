@@ -179,6 +179,7 @@ vscode/
 .coveragec
 
 # vis
+/Results
 result/example.html
 example.html
 dataset/crosswords
