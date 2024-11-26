@@ -113,7 +113,8 @@ class Graph(ABC):
                   max_tries: int = 3, 
                   max_time: int = 600, 
                   return_all_outputs: bool = False,
-                  inference: bool = False) -> List[Any]:
+                  inference: bool = False,
+                  ground_truth: Optional[Dict[str, Any]] = None) -> List[Any]:
  
         def is_node_useful(node):
             if node in self.output_nodes:
@@ -123,7 +124,7 @@ class Graph(ABC):
                 if is_node_useful(successor):
                     return True
             return False
-        
+     
         useful_node_ids = [node_id for node_id, node in self.nodes.items() if is_node_useful(node)]
         in_degree = {node_id: len(self.nodes[node_id].predecessors) for node_id in useful_node_ids}
         zero_in_degree_queue = [node_id for node_id, deg in in_degree.items() if deg == 0 and node_id in useful_node_ids]
@@ -139,7 +140,7 @@ class Graph(ABC):
             tries = 0
             while tries < max_tries:
                 try:
-                    await asyncio.wait_for(self.nodes[current_node_id].execute(inference=inference), timeout=max_time)
+                    await asyncio.wait_for(self.nodes[current_node_id].execute(inference=inference, gt=ground_truth), timeout=max_time)
                     break
                 except asyncio.TimeoutError:
                     print(f"Node {current_node_id} execution timed out, retrying {tries + 1} out of {max_tries}...")

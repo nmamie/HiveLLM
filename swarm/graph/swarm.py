@@ -139,6 +139,7 @@ class Swarm:
             realized_graph: Optional[CompositeGraph] = None,
             display: bool = False,
             inference: bool = False,
+            ground_truth: Optional[Dict[str, Any]] = None,
             ):
 
         if realized_graph is None:
@@ -150,7 +151,7 @@ class Swarm:
         if display:
             _graph.display(draw=self.open_graph_as_html)
 
-        final_answer = asyncio.run(_graph.run(inputs, inference=inference))
+        final_answer = asyncio.run(_graph.run(inputs, inference=inference, ground_truth=ground_truth))
 
         return final_answer
 
@@ -158,6 +159,7 @@ class Swarm:
              inputs: Dict[str, Any],
              realized_graph: Optional[CompositeGraph] = None,
              inference: bool = False,
+             ground_truth: Optional[Dict[str, Any]] = None,
              ):
 
         if realized_graph is None:
@@ -168,6 +170,6 @@ class Swarm:
 
         _graph.display(draw=self.open_graph_as_html)
 
-        final_answer = await _graph.run(inputs, inference=inference)
+        final_answer = await _graph.run(inputs, inference=inference, ground_truth=ground_truth)
 
         return final_answer

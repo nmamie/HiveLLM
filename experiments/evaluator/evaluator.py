@@ -23,6 +23,7 @@ class Evaluator():
             swarm: Optional[Swarm],
             train_dataset: BaseDataset,
             val_dataset: BaseDataset,
+            test_dataset: BaseDataset,
             model_name: Optional[str] = None,
             enable_tensorboard: bool = False,
             enable_artifacts: bool = False,
@@ -32,6 +33,7 @@ class Evaluator():
         self._swarm: Optional[Swarm] = swarm
         self._train_dataset: BaseDataset = train_dataset
         self._val_dataset: BaseDataset = val_dataset
+        self._test_dataset: BaseDataset = test_dataset
         self._model_name: Optional[str] = model_name
 
         datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -48,19 +50,30 @@ class Evaluator():
             self._logger = SummaryWriter(log_dir=self._art_dir_name)
         else:
             self._logger = None
+            
+        self.baseline = 0
+        
+    def _infinite_data_loader(self, dataset) -> Iterator[pd.DataFrame]:
+            perm = np.random.permutation(len(dataset))
+            while True:
+                for idx in perm:
+                    record = dataset[idx.item()]
+                    yield record
 
     async def evaluate_direct_answer(self,
             limit_questions: Optional[int] = None,
             ) -> float:
 
-        dataset = self._val_dataset
+        dataset = self._test_dataset
         print(f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
 
         io_agent = IO(dataset.get_domain(), self._model_name)
 
         accuracy = Accuracy()
+        
+        test_split = self._infinite_data_loader(dataset)
 
-        for i_question, record in tqdm(enumerate(dataset)):
+        for i_question, record in tqdm(enumerate(test_split)):
             print(80*'-')
             if limit_questions is not None:
                 if i_question >= limit_questions:
@@ -148,9 +161,10 @@ class Evaluator():
                 assert realized_graph is not None
 
                 input_dict = dataset.record_to_swarm_input(record)
+                ground_truth = dataset.record_to_target_answer(record)
                 print(input_dict)
 
-                future_answer = self._swarm.arun(input_dict, realized_graph)
+                future_answer = self._swarm.arun(input_dict, realized_graph, ground_truth=ground_truth)
                 future_answers.append(future_answer)
 
             raw_answers = await asyncio.gather(*future_answers)
@@ -158,6 +172,7 @@ class Evaluator():
             print(f"Batch time {time.time() - start_ts:.3f}")
 
             for raw_answer, record in zip(raw_answers, record_batch):
+                raw_answer = raw_answer[0][0]
                 print("Raw answer:", raw_answer)
                 answer = dataset.postprocess_answer(raw_answer)
                 print("Postprocessed answer:", answer)
@@ -203,6 +218,7 @@ class Evaluator():
             self,
             num_iters: int,
             lr: float,
+            beta: float,
             batch_size: int = 4,
             ) -> torch.Tensor:
 
@@ -249,7 +265,8 @@ class Evaluator():
                     )
 
                 input_dict = dataset.record_to_swarm_input(record)
-                answer = self._swarm.arun(input_dict, realized_graph)
+                ground_truth = dataset.record_to_target_answer(record)
+                answer = self._swarm.arun(input_dict, realized_graph, ground_truth=ground_truth)
                 future_answers.append(answer)
                 log_probs.append(log_prob)
                 correct_answer = dataset.record_to_target_answer(record)
@@ -262,6 +279,7 @@ class Evaluator():
             loss_list: List[torch.Tensor] = []
             utilities: List[float] = []
             for raw_answer, log_prob, correct_answer in zip(raw_answers, log_probs, correct_answers):
+                raw_answer = raw_answer[0][0]
                 answer = dataset.postprocess_answer(raw_answer)
                 assert isinstance(correct_answer, str), \
                     f"String expected but got {correct_answer} of type {type(correct_answer)} (1)"
@@ -274,15 +292,21 @@ class Evaluator():
                 
             reward_baseline = torch.tensor(utilities)
             reward_mean = reward_baseline.mean()
-            reward_std = reward_baseline.std()
-
-            # Prevent division by zero
-            if reward_std > 0:
-                normalized_rewards = (reward_baseline - reward_mean) / (reward_std + 1e-8)
+            if self.baseline == 0:
+                self.baseline = reward_mean
             else:
-                normalized_rewards = reward_baseline - reward_mean
+                self.baseline = beta * self.baseline + (1 - beta) * reward_mean
+            normalized_rewards = reward_baseline - self.baseline
+            # reward_std = reward_baseline.std()
+
+            # # Prevent division by zero
+            # if reward_std > 0:
+            #     normalized_rewards = (reward_baseline - reward_mean) / (reward_std + 1e-8)
+            # else:
+            #     normalized_rewards = reward_baseline - reward_mean
 
             print("utilities:", utilities)
+            print("baseline:", self.baseline)
             print("normalized_rewards:", normalized_rewards)
             mean_utility = np.mean(np.array(utilities))
             # total_loss = torch.mean(torch.stack(loss_list))

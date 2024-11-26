@@ -2,6 +2,7 @@ from swarm.environment.operations.combine_answer import CombineAnswer
 from swarm.environment.operations.generate_query import GenerateQuery
 from swarm.environment.operations.direct_answer import DirectAnswer
 from swarm.environment.operations.specialist_answer import SpecialistAnswer
+from swarm.environment.operations.specialist_debate import SpecialistDebate
 from swarm.environment.operations.file_analyse import FileAnalyse
 from swarm.environment.operations.web_search import WebSearch
 from swarm.environment.operations.reflect import Reflect
@@ -15,6 +16,7 @@ __all__ = [
     "GenerateQuery",
     "DirectAnswer",
     "SpecialistAnswer",
+    "SpecialistDebate",
     "FileAnalyse",
     "WebSearch",
     "Reflect",

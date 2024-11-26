@@ -106,13 +106,16 @@ class Node(ABC):
 
         return inputs
 
-    async def execute(self, inference, **kwargs):
+    async def execute(self, inference, gt="", **kwargs):
 
         self.outputs = []
         tasks = []
-        if not self.inputs and self.predecessors:
+        if self.predecessors:
             if self.combine_inputs_as_one:
                 combined_inputs = []
+                for input in self.inputs:
+                    input["gt"] = gt
+                combined_inputs.extend(self.inputs)
                 for predecessor in self.predecessors:
                     predecessor_outputs = predecessor.outputs
                     if predecessor_outputs is not None and isinstance(predecessor_outputs, list):
@@ -120,11 +123,16 @@ class Node(ABC):
                 tasks.append(asyncio.create_task(self._execute(combined_inputs, inference, **kwargs)))
             else:
                 for predecessor in self.predecessors:
+                    for input in self.inputs:
+                        input["gt"] = gt
+                    tasks.append(asyncio.create_task(self._execute(self.inputs, inference, **kwargs)))
                     predecessor_outputs = predecessor.outputs
                     if isinstance(predecessor_outputs, list) and predecessor_outputs:
                         for predecessor_output in predecessor_outputs:
                             tasks.append(asyncio.create_task(self._execute(predecessor_output, inference, **kwargs)))
         elif self.inputs:
+            for input in self.inputs:
+                input['gt'] = gt
             tasks = [asyncio.create_task(self._execute(input, inference, **kwargs)) for input in self.inputs]
         else:
             warnings.warn("No input received.")

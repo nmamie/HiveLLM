@@ -3,6 +3,7 @@ from typing import Union, Literal, Optional
 import argparse
 
 import numpy as np
+from sympy import beta
 import torch
 import random
 
@@ -69,8 +70,8 @@ async def main():
     else:
         N = args.num_truthful_agents
         M = N
-        agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
-        # agent_name_list = N * ["SpecialistAgent"] + M * ["AdversarialAgent"]
+        # agent_name_list = N * ["IO"] + M * ["AdversarialAgent"]
+        agent_name_list = N * ["SpecialistDebater"] + M * ["AdversarialAgent"]
         # agent_name_list = N * ["SpecialistAgent"]
 
         swarm_name = f"{N}true_{M}adv"
@@ -131,8 +132,9 @@ async def main():
         num_iters = 5 if debug else args.num_iterations
 
         lr = 0.1
+        beta = 0.9
 
-        edge_probs = await evaluator.optimize_swarm(num_iters=num_iters, lr=lr)
+        edge_probs = await evaluator.optimize_swarm(num_iters=num_iters, lr=lr, beta=beta)
 
         score = await evaluator.evaluate_swarm(
             mode='external_edge_probs',

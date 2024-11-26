@@ -168,10 +168,11 @@ class Evaluator():
                 assert realized_graph is not None
 
                 input_dict = dataset.record_to_swarm_input(record)
+                ground_truth = dataset.record_to_target_answer(record)
                 print(input_dict)
 
                 # future_answer = self._swarm.arun(input_dict, realized_graph, inference=True)
-                future_answer = self._swarm.arun(input_dict, realized_graph, inference=False)
+                future_answer = self._swarm.arun(input_dict, realized_graph, inference=False, ground_truth=ground_truth)
                 future_answers.append(future_answer)
 
             raw_answers = await asyncio.gather(*future_answers)
@@ -225,6 +226,7 @@ class Evaluator():
             self,
             num_iters: int,
             lr: float,
+            beta: float,
             batch_size: int = 1,
             ) -> torch.Tensor:
 
@@ -292,7 +294,8 @@ class Evaluator():
                     )
 
                 input_dict = dataset.record_to_swarm_input(record)
-                answer = swarm_copy.arun(input_dict, realized_graph, inference=False)
+                ground_truth = dataset.record_to_target_answer(record)
+                answer = swarm_copy.arun(input_dict, realized_graph, inference=False, ground_truth=ground_truth)
                 future_answers.append(answer)
                 log_probs.append(log_prob)
                 correct_answer = dataset.record_to_target_answer(record)
