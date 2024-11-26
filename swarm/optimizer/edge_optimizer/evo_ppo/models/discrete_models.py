@@ -99,19 +99,22 @@ class CategoricalGATPolicy(nn.Module):
         # x = torch.cat((x, sentence_embedding), dim=1)
 
         # Pass through GAT layers
-        x = self.conv1(x, edge_index)
+        x, attention1 = self.conv1(
+            x, edge_index, return_attention_weights=True)
         x = F.elu(x)
         
         x = self.norm_attention(x)
 
         # x_res = x
-        x, attention = self.conv2(
+        x, attention2 = self.conv2(
             x, edge_index, return_attention_weights=True)
         
         x = self.norm_hidden(x)        
         
         # stack active node features for action prediction
         active_node_features = x[active_node_idx].unsqueeze(0)
+        
+        attention = (attention1, attention2)
         
         # concatenate with sentence embedding
         if active_node_features.size(0) != sentence_embedding.size(0):
