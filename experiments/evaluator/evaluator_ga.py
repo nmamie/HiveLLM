@@ -122,7 +122,7 @@ class Evaluator():
 
         assert self._swarm is not None
 
-        dataset = self._val_dataset
+        dataset = self._test_dataset
 
         print(f"Evaluating swarm on {dataset.__class__.__name__} split {dataset.split}")
 
@@ -180,7 +180,7 @@ class Evaluator():
             print(f"Batch time {time.time() - start_ts:.3f}")
 
             for raw_answer, record in zip(raw_answers, record_batch):
-                raw_answer = raw_answer[0]
+                raw_answer = raw_answer[0][0]
                 print("Raw answer:", raw_answer)
                 answer = dataset.postprocess_answer(raw_answer)
                 print("Postprocessed answer:", answer)
@@ -204,7 +204,7 @@ class Evaluator():
             with open(eval_json_name, "w") as f:
                 json.dump(dct, f)
 
-    def _print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False):
+    def _print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False, i_iter: int = 0) -> None:
         assert self._swarm is not None
         msgs = []
         for i_conn, (conn, prob) in enumerate(zip(
@@ -218,9 +218,10 @@ class Evaluator():
             print(msg)
         if save_to_file:
             if self._art_dir_name is not None:
-                txt_name = os.path.join(self._art_dir_name, "connections.txt")
-                with open(txt_name, "w") as f:
-                    f.writelines(msgs)
+                if i_iter == 0:
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, "edge_logits_final.pt"))
+                else: 
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
     async def optimize_swarm(
             self,

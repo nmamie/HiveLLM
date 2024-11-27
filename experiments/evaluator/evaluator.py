@@ -12,7 +12,7 @@ import json
 import math
 
 from swarm.graph import Graph
-from swarm.environment.agents import IO
+from swarm.environment.agents import IO, COT
 from swarm.graph.swarm import Swarm
 from experiments.evaluator.datasets.base_dataset import BaseDataset
 from experiments.evaluator.accuracy import Accuracy
@@ -83,6 +83,7 @@ class Evaluator():
             print(input_dict)
 
             raw_answer = await io_agent.run(input_dict)
+            raw_answer = raw_answer[0][0]
 
             print("Raw answer:", raw_answer)
             answer = dataset.postprocess_answer(raw_answer)
@@ -100,6 +101,51 @@ class Evaluator():
 
         print("Done!")
         return accuracy.get()
+    
+    
+    async def evaluate_cot(
+            self,
+            limit_questions: Optional[int] = None,
+            ) -> float:
+
+        dataset = self._test_dataset
+        print(f"Evaluating COT on {dataset.get_domain()} split {dataset.split}")
+
+        cot_agent = COT(dataset.get_domain(), self._model_name)
+
+        accuracy = Accuracy()
+        
+        test_split = self._infinite_data_loader(dataset)
+
+        for i_question, record in tqdm(enumerate(test_split)):
+            print(80*'-')
+            if limit_questions is not None:
+                if i_question >= limit_questions:
+                    break
+
+            input_dict = dataset.record_to_swarm_input(record)
+            print(input_dict)
+
+            raw_answer = await cot_agent.run(input_dict)
+            raw_answer = raw_answer[0][0]
+
+            print("Raw answer:", raw_answer)
+            answer = dataset.postprocess_answer(raw_answer)
+            print("Postprocessed answer:", answer)
+            correct_answer = dataset.record_to_target_answer(record)
+            accuracy.update(answer, correct_answer)
+            accuracy.print()
+
+        print("Final accuracy:")
+        accuracy.print()
+
+        self._dump_eval_results(dict(
+            accuracy=accuracy.get(),
+            limit_questions=limit_questions))
+
+        print("Done!")
+        return accuracy.get()
+        
 
     async def evaluate_swarm(
             self,
@@ -115,7 +161,7 @@ class Evaluator():
 
         assert self._swarm is not None
 
-        dataset = self._val_dataset
+        dataset = self._test_dataset
 
         print(f"Evaluating swarm on {dataset.__class__.__name__} split {dataset.split}")
 
@@ -196,7 +242,7 @@ class Evaluator():
             with open(eval_json_name, "w") as f:
                 json.dump(dct, f)
 
-    def _print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False):
+    def _print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False, i_iter: int = 0) -> None:
         assert self._swarm is not None
         msgs = []
         for i_conn, (conn, prob) in enumerate(zip(
@@ -210,9 +256,10 @@ class Evaluator():
             print(msg)
         if save_to_file:
             if self._art_dir_name is not None:
-                txt_name = os.path.join(self._art_dir_name, "connections.txt")
-                with open(txt_name, "w") as f:
-                    f.writelines(msgs)
+                if i_iter == 0:
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, "edge_logits_final.pt"))
+                else: 
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
     async def optimize_swarm(
             self,
@@ -290,21 +337,17 @@ class Evaluator():
                 single_loss = - log_prob * utility
                 loss_list.append(single_loss)
                 
-            reward_baseline = torch.tensor(utilities)
-            reward_mean = reward_baseline.mean()
-            if self.baseline == 0:
-                self.baseline = reward_mean
+            if beta == 0:
+                normalized_rewards = torch.tensor(utilities)
             else:
-                self.baseline = beta * self.baseline + (1 - beta) * reward_mean
-            normalized_rewards = reward_baseline - self.baseline
-            # reward_std = reward_baseline.std()
-
-            # # Prevent division by zero
-            # if reward_std > 0:
-            #     normalized_rewards = (reward_baseline - reward_mean) / (reward_std + 1e-8)
-            # else:
-            #     normalized_rewards = reward_baseline - reward_mean
-
+                reward_baseline = torch.tensor(utilities)
+                reward_mean = reward_baseline.mean()
+                if self.baseline == 0:
+                    self.baseline = reward_mean
+                else:
+                    self.baseline = beta * self.baseline + (1 - beta) * reward_mean
+                normalized_rewards = reward_baseline - self.baseline
+            
             print("utilities:", utilities)
             print("baseline:", self.baseline)
             print("normalized_rewards:", normalized_rewards)
@@ -323,7 +366,7 @@ class Evaluator():
             edge_probs = torch.sigmoid(self._swarm.connection_dist.edge_logits)
             print("edge_probs:", edge_probs)
 
-            self._print_conns(edge_probs)
+            self._print_conns(edge_probs, save_to_file=True, i_iter=i_iter+1)
 
             if self._logger is not None:
                 self._logger.add_scalar("train/loss", total_loss.item(), i_iter)

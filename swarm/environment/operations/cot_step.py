@@ -83,6 +83,7 @@ class CoTStep(Node):
                 concatenated_response = response
             else:
                 concatenated_response = f"{task}. Here is the next thought. {response}. "
+                print(f"Thought: {concatenated_response}")
 
             execution = {
                 "operation": self.node_name,

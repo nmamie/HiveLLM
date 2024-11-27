@@ -3,6 +3,7 @@ from swarm.environment.agents.tot import TOT
 from swarm.environment.agents.cot import COT
 from swarm.environment.agents.specialist_agent import SpecialistAgent
 from swarm.environment.agents.specialist_debater import SpecialistDebater
+from swarm.environment.agents.random_debater import RandomDebater
 from swarm.environment.agents.adversarial_agent import AdversarialAgent
 from swarm.environment.agents.agent_registry import AgentRegistry
 from swarm.environment.agents.crosswords.tot import CrosswordsToT
@@ -21,6 +22,7 @@ __all__ = [
     "COT",
     "SpecialistAgent",
     "SpecialistDebater",
+    "RandomDebater",
     "AdversarialAgent",
     "AgentRegistry",
     "CrosswordsToT",

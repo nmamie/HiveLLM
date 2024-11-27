@@ -270,7 +270,7 @@ class GeneticAlgorithmBase(SkoBase, metaclass=ABCMeta):
             # print("Order parameters:")
             # print(order_params)
 
-            self.print_conns(edge_logits)
+            self.print_conns(edge_logits, save_to_file=True, i_iter=i_iter+1)
 
             if self.early_stop:
                 best.append(min(self.generation_best_Y))
@@ -449,7 +449,7 @@ class GA(GeneticAlgorithmBase):
             return X
         
         
-    def print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False):
+    def print_conns(self, edge_probs: torch.Tensor, save_to_file: bool = False, i_iter: int = 0) -> None:
         assert self._swarm is not None
         msgs = []
         for i_conn, (conn, prob) in enumerate(zip(
@@ -463,9 +463,10 @@ class GA(GeneticAlgorithmBase):
             print(msg)
         if save_to_file:
             if self._art_dir_name is not None:
-                txt_name = os.path.join(self._art_dir_name, "connections.txt")
-                with open(txt_name, "w") as f:
-                    f.writelines(msgs)
+                if i_iter == 0:
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, "edge_logits_final.pt"))
+                else: 
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
 
     # ranking = ranking.ranking
