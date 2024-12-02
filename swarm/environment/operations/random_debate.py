@@ -13,6 +13,7 @@ from swarm.environment.prompt.prompt_set_registry import PromptSetRegistry
 from swarm.llm.format import Message
 from swarm.llm import LLMRegistry
 from swarm.optimizer.node_optimizer import MetaPromptOptimizer
+import numpy as np
 
 
 """
@@ -77,8 +78,8 @@ class RandomDebate(Node):
         self.domain = domain
         self.model_name = model_name
         # Override role with a specialist role and fetch role description.
-        idx_role = hash(self.id) % len(self.role_list)
-        # idx_role = np.random.randint(0, len(self.role_list))
+        # idx_role = hash(self.id) % len(self.role_list)
+        idx_role = np.random.randint(0, len(self.role_list))
         self.role_info = self.role_list[idx_role]
         self.role = self.role_info["role"]
         self.role_description = self.role_info["description"]

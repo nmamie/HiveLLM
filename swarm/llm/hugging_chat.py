@@ -108,11 +108,12 @@ curr_inf = False
 def load_model(inference: bool = False):
     if inference is True:
         # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
-        # model_id = "meta-llama/Llama-3.2-3B-Instruct"
-        model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     else:
-        # model_id = "meta-llama/Llama-3.2-3B-Instruct"
-        model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
+        model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
     # models = []
 

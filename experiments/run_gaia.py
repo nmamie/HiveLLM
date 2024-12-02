@@ -71,7 +71,7 @@ async def main():
 
     experiment_name = "ToolTOT"
 
-    swarm = Swarm(["ToolTOT"]*3, 
+    swarm = Swarm(["ToolTOT"], 
                   "gaia",
                   model_name=args.llm, #args.llm, #"mock", #args.llm,#args.llm,
                   final_node_class="FinalDecision",
@@ -111,7 +111,9 @@ async def main():
 
         # Swarm
         answer = await swarm.composite_graph.run(inputs)
-        answer = answer[-1].split("FINAL ANSWER: ")[-1]
+        print(answer)
+        # answer = f"FINAL ANSWER: {answer}"
+        answer = answer[0][-1].split("FINAL ANSWER: ")[-1]
 
         end_time = time.time()
         exe_time =  end_time - start_time

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from numpy import dtype
 import torch
 import torch.nn as nn
 from copy import deepcopy
@@ -37,6 +38,8 @@ class EdgeWiseDistribution(ConnectDistribution):
             requires_grad=True) * init_logit
         self.edge_logits = torch.nn.Parameter(init_tensor)
         node_ids = set([x for pair in potential_connections for x in pair])
+        init_base = torch.randn(1, requires_grad=True)
+        self.baseline = torch.nn.Parameter(init_base)
         self.node_idx2id = {i: node_id for i, node_id in enumerate(node_ids)}
         self.node_id2idx = {node_id: i for i, node_id in enumerate(node_ids)}
         # order_tensor = torch.randn(len(node_ids))

@@ -4,16 +4,16 @@ import pandas as pd
 from typing import Iterable, Optional, Iterator, Union, Literal, List, Dict, Any
 from tqdm import tqdm
 import torch
+import torch.nn.functional as F
 import time
 import datetime
 from torch.utils.tensorboard.writer import SummaryWriter
 import numpy as np
 import json
 import math
-import copy
 
 from swarm.graph import Graph
-from swarm.environment.agents import IO
+from swarm.environment.agents import IO, COT, SpecialistDebater
 from swarm.graph.swarm import Swarm
 from experiments.evaluator.datasets.base_dataset import BaseDataset
 from experiments.evaluator.accuracy import Accuracy
@@ -27,7 +27,7 @@ class Evaluator():
             swarm: Optional[Swarm],
             train_dataset: BaseDataset,
             val_dataset: BaseDataset,
-            test_dataset: BaseDataset = None,
+            test_dataset: BaseDataset,
             model_name: Optional[str] = None,
             enable_tensorboard: bool = False,
             enable_artifacts: bool = False,
@@ -37,7 +37,7 @@ class Evaluator():
         self._swarm: Optional[Swarm] = swarm
         self._train_dataset: BaseDataset = train_dataset
         self._val_dataset: BaseDataset = val_dataset
-        self._test_dataset: Optional[BaseDataset] = test_dataset
+        self._test_dataset: BaseDataset = test_dataset
         self._model_name: Optional[str] = model_name
 
         datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -45,7 +45,11 @@ class Evaluator():
                         (f"_{tensorboard_tag}" if tensorboard_tag is not None else ""))
 
         if enable_artifacts or enable_tensorboard:
-            self._art_dir_name = os.path.join("runs", art_dir_name)
+            print(f"Domain: {train_dataset.get_domain()}")
+            if train_dataset.get_domain() == 'mmlu':
+                self._art_dir_name = os.path.join("runs", art_dir_name)
+            else:
+                self._art_dir_name = os.path.join("runs", "_pro", art_dir_name)
             os.makedirs(self._art_dir_name, exist_ok=True)
         else:
             self._art_dir_name = None
@@ -70,9 +74,10 @@ class Evaluator():
 
         dataset = self._test_dataset
         
-        print(f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
+        print(
+            f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
 
-        io_agent = IO(dataset.get_domain(), self._model_name)
+        single_agent = SpecialistDebater(dataset.get_domain(), self._model_name)
 
         accuracy = Accuracy()
         
@@ -88,7 +93,7 @@ class Evaluator():
             input_dict = dataset.record_to_swarm_input(record)
             print(input_dict)
 
-            raw_answer = await io_agent.run(input_dict, inference=True)
+            raw_answer = await single_agent.run(input_dict, inference=True)
 
             print("Raw answer:", raw_answer)
             raw_answer = raw_answer[0]

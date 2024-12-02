@@ -4,6 +4,7 @@ import pandas as pd
 from typing import Iterable, Optional, Iterator, Union, Literal, List, Dict, Any
 from tqdm import tqdm
 import torch
+import torch.nn.functional as F
 import time
 import datetime
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -12,10 +13,11 @@ import json
 import math
 
 from swarm.graph import Graph
-from swarm.environment.agents import IO, COT
+from swarm.environment.agents import IO, COT, SpecialistDebater
 from swarm.graph.swarm import Swarm
 from experiments.evaluator.datasets.base_dataset import BaseDataset
 from experiments.evaluator.accuracy import Accuracy
+
 
 class Evaluator():
     def __init__(
@@ -41,7 +43,11 @@ class Evaluator():
                         (f"_{tensorboard_tag}" if tensorboard_tag is not None else ""))
 
         if enable_artifacts or enable_tensorboard:
-            self._art_dir_name = os.path.join("runs", art_dir_name)
+            print(f"Domain: {train_dataset.get_domain()}")
+            if train_dataset.get_domain() == 'mmlu':
+                self._art_dir_name = os.path.join("runs", art_dir_name)
+            else:
+                self._art_dir_name = os.path.join("runs", "_pro", art_dir_name)
             os.makedirs(self._art_dir_name, exist_ok=True)
         else:
             self._art_dir_name = None
@@ -50,9 +56,7 @@ class Evaluator():
             self._logger = SummaryWriter(log_dir=self._art_dir_name)
         else:
             self._logger = None
-            
-        self.baseline = 0
-        
+
     def _infinite_data_loader(self, dataset) -> Iterator[pd.DataFrame]:
             perm = np.random.permutation(len(dataset))
             while True:
@@ -65,12 +69,13 @@ class Evaluator():
             ) -> float:
 
         dataset = self._test_dataset
-        print(f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
+        print(
+            f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
 
-        io_agent = IO(dataset.get_domain(), self._model_name)
+        single_agent = SpecialistDebater(dataset.get_domain(), self._model_name)
 
         accuracy = Accuracy()
-        
+
         test_split = self._infinite_data_loader(dataset)
 
         for i_question, record in tqdm(enumerate(test_split)):
@@ -82,7 +87,7 @@ class Evaluator():
             input_dict = dataset.record_to_swarm_input(record)
             print(input_dict)
 
-            raw_answer = await io_agent.run(input_dict)
+            raw_answer = await single_agent.run(input_dict)
             raw_answer = raw_answer[0][0]
 
             print("Raw answer:", raw_answer)
@@ -101,20 +106,20 @@ class Evaluator():
 
         print("Done!")
         return accuracy.get()
-    
-    
+
     async def evaluate_cot(
             self,
             limit_questions: Optional[int] = None,
             ) -> float:
 
         dataset = self._test_dataset
-        print(f"Evaluating COT on {dataset.get_domain()} split {dataset.split}")
+        print(
+            f"Evaluating COT on {dataset.get_domain()} split {dataset.split}")
 
         cot_agent = COT(dataset.get_domain(), self._model_name)
 
         accuracy = Accuracy()
-        
+
         test_split = self._infinite_data_loader(dataset)
 
         for i_question, record in tqdm(enumerate(test_split)):
@@ -145,7 +150,6 @@ class Evaluator():
 
         print("Done!")
         return accuracy.get()
-        
 
     async def evaluate_swarm(
             self,
@@ -163,15 +167,18 @@ class Evaluator():
 
         dataset = self._test_dataset
 
-        print(f"Evaluating swarm on {dataset.__class__.__name__} split {dataset.split}")
+        print(
+            f"Evaluating swarm on {dataset.__class__.__name__} split {dataset.split}")
 
         realized_graph: Optional[Graph]
         if mode == 'full_connected_swarm':
-            realized_graph = self._swarm.connection_dist.realize_full(self._swarm.composite_graph)
+            realized_graph = self._swarm.connection_dist.realize_full(
+                self._swarm.composite_graph)
         elif mode == 'external_edge_probs':
             assert edge_probs is not None
             edge_mask = edge_probs > 0.5
-            realized_graph = self._swarm.connection_dist.realize_mask(self._swarm.composite_graph, edge_mask)
+            realized_graph = self._swarm.connection_dist.realize_mask(
+                self._swarm.composite_graph, edge_mask)
             realized_graph.display()
         else:
             realized_graph = None
@@ -192,7 +199,8 @@ class Evaluator():
                 yield records
             return
 
-        data_len = min(len(dataset), limit_questions) if limit_questions is not None else len(dataset)
+        data_len = min(
+            len(dataset), limit_questions) if limit_questions is not None else len(dataset)
         num_batches = int(math.ceil(data_len / eval_batch_size))
 
         for i_batch, record_batch in tqdm(enumerate(eval_loader(batch_size=eval_batch_size)), total=num_batches):
@@ -203,14 +211,16 @@ class Evaluator():
             future_answers = []
             for record in record_batch:
                 if mode == 'randomly_connected_swarm':
-                    realized_graph, _ = self._swarm.connection_dist.realize(self._swarm.composite_graph)
+                    realized_graph, _ = self._swarm.connection_dist.realize(
+                        self._swarm.composite_graph)
                 assert realized_graph is not None
 
                 input_dict = dataset.record_to_swarm_input(record)
                 ground_truth = dataset.record_to_target_answer(record)
                 print(input_dict)
 
-                future_answer = self._swarm.arun(input_dict, realized_graph, ground_truth=ground_truth)
+                future_answer = self._swarm.arun(
+                    input_dict, realized_graph, ground_truth=ground_truth)
                 future_answers.append(future_answer)
 
             raw_answers = await asyncio.gather(*future_answers)
@@ -229,7 +239,7 @@ class Evaluator():
 
         accuracy.print()
         print("Done!")
-        
+
         self._dump_eval_results(dict(
             accuracy=accuracy.get(),
             limit_questions=limit_questions))
@@ -238,7 +248,8 @@ class Evaluator():
 
     def _dump_eval_results(self, dct: Dict[str, Any]) -> None:
         if self._art_dir_name is not None:
-            eval_json_name = os.path.join(self._art_dir_name, "evaluation.json")
+            eval_json_name = os.path.join(
+                self._art_dir_name, "evaluation.json")
             with open(eval_json_name, "w") as f:
                 json.dump(dct, f)
 
@@ -257,9 +268,11 @@ class Evaluator():
         if save_to_file:
             if self._art_dir_name is not None:
                 if i_iter == 0:
-                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, "edge_logits_final.pt"))
-                else: 
-                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(
+                        self._art_dir_name, "edge_logits_final.pt"))
+                else:
+                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(
+                        self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
     async def optimize_swarm(
             self,
@@ -273,9 +286,14 @@ class Evaluator():
 
         dataset = self._train_dataset
 
-        print(f"Optimizing swarm on {dataset.__class__.__name__} split {dataset.split}")
+        print(
+            f"Optimizing swarm on {dataset.__class__.__name__} split {dataset.split}")
 
-        optimizer = torch.optim.Adam(self._swarm.connection_dist.parameters(), lr=lr)
+        policy_optimizer = torch.optim.Adam(
+            [self._swarm.connection_dist.edge_logits], lr=lr)
+        if beta > 0:
+            baseline_optimizer = torch.optim.Adam(
+                [self._swarm.connection_dist.baseline], lr=beta)
 
         if self._art_dir_name is not None:
             hp_json_name = os.path.join(self._art_dir_name, "hp.json")
@@ -313,7 +331,8 @@ class Evaluator():
 
                 input_dict = dataset.record_to_swarm_input(record)
                 ground_truth = dataset.record_to_target_answer(record)
-                answer = self._swarm.arun(input_dict, realized_graph, ground_truth=ground_truth)
+                answer = self._swarm.arun(
+                    input_dict, realized_graph, ground_truth=ground_truth)
                 future_answers.append(answer)
                 log_probs.append(log_prob)
                 correct_answer = dataset.record_to_target_answer(record)
@@ -325,56 +344,74 @@ class Evaluator():
 
             loss_list: List[torch.Tensor] = []
             utilities: List[float] = []
+
             for raw_answer, log_prob, correct_answer in zip(raw_answers, log_probs, correct_answers):
                 raw_answer = raw_answer[0][0]
                 answer = dataset.postprocess_answer(raw_answer)
                 assert isinstance(correct_answer, str), \
                     f"String expected but got {correct_answer} of type {type(correct_answer)} (1)"
+
                 accuracy = Accuracy()
                 accuracy.update(answer, correct_answer)
                 utility = accuracy.get()
                 utilities.append(utility)
-                single_loss = - log_prob * utility
-                loss_list.append(single_loss)
                 
-            if beta == 0:
-                normalized_rewards = torch.tensor(utilities)
-            else:
-                reward_baseline = torch.tensor(utilities)
-                reward_mean = reward_baseline.mean()
-                if self.baseline == 0:
-                    self.baseline = reward_mean
-                else:
-                    self.baseline = beta * self.baseline + (1 - beta) * reward_mean
-                normalized_rewards = reward_baseline - self.baseline
-            
-            print("utilities:", utilities)
-            print("baseline:", self.baseline)
-            print("normalized_rewards:", normalized_rewards)
-            mean_utility = np.mean(np.array(utilities))
-            # total_loss = torch.mean(torch.stack(loss_list))
-            # Compute loss with normalized rewards
-            total_loss = (-torch.stack(log_probs) * normalized_rewards).mean()
+                state_value = torch.sigmoid(self._swarm.connection_dist.baseline)
 
+                # Compute advantage
+                if beta > 0:
+                    advantage = utility - state_value
+                else:
+                    advantage = utility
+                single_loss = -log_prob * advantage
+                loss_list.append(single_loss)
+
+            print("utilities:", utilities)
+            print("state_value:", state_value.item())
+            mean_utility = np.mean(np.array(utilities))
+            print("mean_utility:", mean_utility)
+
+            # Compute policy loss
+            total_loss = torch.mean(torch.stack(loss_list))
             print("loss:", total_loss.item())
-            optimizer.zero_grad()
+
+            policy_optimizer.zero_grad()
             total_loss.backward()
-            print("Grad:", self._swarm.connection_dist.edge_logits.grad)
-            optimizer.step()
+            print("Grad logits:", self._swarm.connection_dist.edge_logits.grad)
+            policy_optimizer.step()
+            
+            if beta > 0:
+                # Update baseline
+                baseline_loss = F.mse_loss(
+                    torch.sigmoid(self._swarm.connection_dist.baseline),
+                    torch.tensor(mean_utility, dtype=torch.float32, requires_grad=False))
+                print("baseline_loss:", baseline_loss.item())
+                baseline_optimizer.zero_grad()
+                baseline_loss.backward()
+                print("Grad baseline:", self._swarm.connection_dist.baseline.grad)
+                baseline_optimizer.step()
 
             print("edge_logits:", self._swarm.connection_dist.edge_logits)
             edge_probs = torch.sigmoid(self._swarm.connection_dist.edge_logits)
             print("edge_probs:", edge_probs)
+            
+            print("baseline_logits:", self._swarm.connection_dist.baseline)
+            baseline = torch.sigmoid(self._swarm.connection_dist.baseline)
+            print("baseline:", baseline)
 
             self._print_conns(edge_probs, save_to_file=True, i_iter=i_iter+1)
 
             if self._logger is not None:
-                self._logger.add_scalar("train/loss", total_loss.item(), i_iter)
-                self._logger.add_scalar("train/utility", mean_utility.item(), i_iter)
+                self._logger.add_scalar(
+                    "train/loss", total_loss.item(), i_iter)
+                self._logger.add_scalar(
+                    "train/utility", mean_utility.item(), i_iter)
             if self._art_dir_name is not None:
-                log_jsonl_name = os.path.join(self._art_dir_name, "training.jsonl")
+                log_jsonl_name = os.path.join(
+                    self._art_dir_name, "training.jsonl")
                 with open(log_jsonl_name, "a") as f:
-                    json.dump(dict(iter=i_iter, train_loss=total_loss.item(), train_utility=mean_utility.item()), f)
+                    json.dump(dict(iter=i_iter, train_loss=total_loss.item(
+                    ), train_utility=mean_utility.item()), f)
                     f.write("\n")
             print("end of iteration")
 

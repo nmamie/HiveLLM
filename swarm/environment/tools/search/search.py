@@ -101,4 +101,4 @@ if __name__ == "__main__":
     # print(search_engine.search("cell phone tower"))
 
     # print(SearchAPIEngine().search("Juergen Schmidhuber"))
-    print(SearchEngine().search("Marvin Minsky"))
+    print(SearchEngine().chat("Marvin Minsky"))

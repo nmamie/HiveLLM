@@ -47,23 +47,26 @@ class WebSearch(Node):
 
             message = [Message(role="system", content=f"You are a {self.role}."),
                        Message(role="user", content=prompt)]
-            generated_quires = await self.llm.agen(message)
+            generated_queries = await self.llm.agen(message)
 
 
-            generated_quires = generated_quires.split(',')[:max_keywords]
-            logger.info(f"The search keywords include: {generated_quires}")
+            # generated_queries = generated_queries.split(',')[:max_keywords]
+            # logger.info(f"The search keywords include: {generated_quires}")
+            
+            prompt = generated_queries
+            print(f"The web search prompt: {prompt}")
             
             # prompt = task + " " + query
             # logger.info(f"The web search prompt: {prompt}")
             
-            search_results = [', '.join([result['body'] for result in self.web_search(query)]) for query in generated_quires]
-            # search_results = self.web_search(prompt)
+            # search_results = [', '.join([result['body'] for result in self.web_search(query)]) for query in generated_quires]
+            search_results = self.web_search(prompt)
 
 
             logger.info(f"The search result: {search_results}")
 
             distill_prompt = self.prompt_set.get_distill_websearch_prompt(
-               question=input["task"], query=query, results='.\n'.join(search_results))
+               question=input["task"], query=query, results=search_results)
             
             message = [Message(role="system", content=f"You are a {self.role}."),
                        Message(role="user", content=distill_prompt)]
@@ -86,6 +89,6 @@ class WebSearch(Node):
         return outputs
 
     def web_search(self, query):
-        return searcher.search(query)
+        return searcher.chat(query)
     
 

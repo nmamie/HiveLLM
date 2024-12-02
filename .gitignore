@@ -194,6 +194,7 @@ dataset/gaia/gaia/utils/*.jsonl
 dataset/gaia/__MACOSX/
 
 /runs/
+/runs_old/
 
 transformers/
 

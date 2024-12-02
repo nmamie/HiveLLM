@@ -1,5 +1,6 @@
 import asyncio
 import os
+from re import split
 from typing import Union, Literal, Optional
 import argparse
 
@@ -10,8 +11,8 @@ import random
 
 from swarm.graph.swarm import Swarm
 from swarm.environment.operations.final_decision import MergingStrategy
-from experiments.evaluator.datasets.mmlu_dataset import MMLUDataset
-from dataset.MMLU.download import download
+from experiments.evaluator.datasets.mmlu_pro_dataset import MMLUProDataset
+# from dataset.MMLU.download import download
 
 
 def parse_args():
@@ -138,21 +139,12 @@ async def main():
         if tag is None:
             tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_seed{seed}"
         
-
-        download()
-
-        dataset_train = MMLUDataset('dev')
-        dataset_val = MMLUDataset('val')
-        dataset_test = MMLUDataset('test')
         
-        # # build pytorch dataset for GPU efficiency
-        # class Dataset(torch.utils.data.Dataset):
-        #     def __init__(self, dataset):
-        #         self.dataset = dataset
-        #     def __len__(self):
-        #         return len(self.dataset)
-        #     def __getitem__(self, idx):
-        #         return self.dataset[idx]
+        # combine MMLUProDataset to one dataset
+        dataset_train = MMLUProDataset(split='train')
+        dataset_val = MMLUProDataset(split='val')
+        dataset_test = MMLUProDataset(split='test')
+
         
         evaluator = Evaluator(
             swarm,

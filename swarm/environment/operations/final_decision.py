@@ -109,16 +109,37 @@ class FinalDecision(Node):
         
             response = await self.llm.agen(message, inference=inference)
 
+        # elif self.strategy == MergingStrategy.MajorityVote:
+        #     if len(inputs) == 0:
+        #         raise Exception("No inputs is not supported for MajorityVote")
+        #     answers = [input.get("output") for input in inputs]
+        #     counter = Counter(answers)
+        #     sorted_counter = counter.most_common()
+        #     max_freq = sorted_counter[0][1]
+        #     equally_frequent_answers = [ans for ans, freq in sorted_counter if freq == max_freq]
+        #     response = random.choice(equally_frequent_answers)
+        #     print(f"{answers=} {response=}")
+        
         elif self.strategy == MergingStrategy.MajorityVote:
             if len(inputs) == 0:
                 raise Exception("No inputs is not supported for MajorityVote")
             answers = [input.get("output") for input in inputs]
-            counter = Counter(answers)
+            choices = [ans[0] for ans in answers]
+            counter = Counter(choices)
             sorted_counter = counter.most_common()
+            print(f"SORTED COUNTER: {sorted_counter}")
+            # print(f"Agent opinions: {agent_opinions}")
             max_freq = sorted_counter[0][1]
+            # confidence = max_freq / len(answers)
             equally_frequent_answers = [ans for ans, freq in sorted_counter if freq == max_freq]
-            response = random.choice(equally_frequent_answers)
-            print(f"{answers=} {response=}")
+            response = ""
+            for ans in answers:
+                if ans[0] in equally_frequent_answers:
+                    response = ans
+                    break
+            if response == "":
+                response = random.choice(equally_frequent_answers)
+            # print(f"{answers=} {response=}")
             
         elif self.strategy == MergingStrategy.RandomChoice:
             if len(inputs) == 0:
