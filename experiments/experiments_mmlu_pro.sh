@@ -1,6 +1,6 @@
 #####################BASE EXPERIMENTS#####################
 
-# PYTHONPATH=. python experiments/run_mmlu_pro.py --mode=DirectAnswer
+PYTHONPATH=. python experiments/run_mmlu_pro.py --mode=DirectAnswer
 
 PYTHONPATH=. python experiments/run_mmlu_pro.py --mode=COT
 

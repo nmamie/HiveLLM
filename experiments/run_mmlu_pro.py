@@ -37,8 +37,8 @@ def parse_args():
     parser.add_argument('--model_name', type=str, default="inference",
                         help="Model name, None runs the default ChatGPT4. Custom runs HF model. Inference runs the Meta-LLama-3.1-8B-Instruct model.")
 
-    parser.add_argument('--domain', type=str, default="mmlu",
-                        help="Domain (the same as dataset name), default 'MMLU'")
+    parser.add_argument('--domain', type=str, default="mmlu_pro",
+                        help="Domain (the same as dataset name), default 'mmlu_pro'")
     
     parser.add_argument('--optimizer', type=str, default="gradient",
                         choices=['gradient', 'ga'],

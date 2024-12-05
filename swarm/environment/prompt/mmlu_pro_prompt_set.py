@@ -45,8 +45,7 @@ class MMLUProPromptSet(PromptSet):
             I will ask you a question.
             I will also give you 10 answers enumerated as A, B, C, D, E, F, G, H, I and J.
             Only one answer out of the offered 10 is correct.
-            You must choose the correct answer to the question, 
-            also considering the inputs from other agents. The moderator leads the discussion.
+            You must choose the correct answer to the question, also considering the inputs from other agents.
             Your response must start with one of the 10 letters: A, B, C, D, E, F, G, H, I and J,
             corresponding to the correct answer.
             After the single-letter answer, add a very short explanation of why you gave this answer.
@@ -59,7 +58,7 @@ class MMLUProPromptSet(PromptSet):
             I will also give you 10 answers enumerated as A, B, C, D, E, F, G, H, I and J.
             Only one answer out of the offered 10 is correct.
             You must choose the correct answer to the question, also considering the inputs from other agents.
-            Your response must start with one of the 4 letters: A, B, C, D, E, F, G, H, I and J,
+            Your response must start with one of the 10 letters: A, B, C, D, E, F, G, H, I and J,
             corresponding to the correct answer.
             After the single-letter answer, provide a very short (max. 64 tokens) explanation of why you gave this answer.
         """
@@ -79,7 +78,7 @@ class MMLUProPromptSet(PromptSet):
         
     @staticmethod
     def get_format():
-        return "one of the letters: A, B, C, D, E, F, G, H, I and J"
+        return "one of the 10 letters: A, B, C, D, E, F, G, H, I and J"
 
 
     @staticmethod

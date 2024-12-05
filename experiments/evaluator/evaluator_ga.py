@@ -11,6 +11,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import numpy as np
 import json
 import math
+import copy
 
 from swarm.graph import Graph
 from swarm.environment.agents import IO, COT, SpecialistDebater
