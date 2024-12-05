@@ -180,6 +180,8 @@ vscode/
 
 # vis
 /Results
+/experiment_results/
+/experiments.ipynb
 result/example.html
 example.html
 dataset/crosswords
