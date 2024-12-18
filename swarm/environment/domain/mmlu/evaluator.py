@@ -22,7 +22,6 @@ from swarm.environment.agents import IO
 from swarm.graph.swarm import Swarm
 from experiments.evaluator.datasets.base_dataset import BaseDataset
 from experiments.evaluator.accuracy import Accuracy
-from swarm.optimizer.edge_optimizer.evo_tools.GARL import GARL
 
 from datasets import Dataset
 from transformers import BertModel, BertTokenizer
@@ -32,7 +31,7 @@ class Evaluator():
             self,
             swarm: Optional[Swarm],
             train_dataset: BaseDataset,
-            val_dataset: BaseDataset,\
+            val_dataset: BaseDataset,
             test_dataset: BaseDataset,
             model_name: Optional[str] = None,
             enable_tensorboard: bool = False,
@@ -52,7 +51,11 @@ class Evaluator():
                         (f"_{tensorboard_tag}" if tensorboard_tag is not None else ""))
 
         if enable_artifacts or enable_tensorboard:
-            self._art_dir_name = os.path.join("runs", art_dir_name)
+            print(f"Domain: {train_dataset.get_domain()}")
+            if train_dataset.get_domain() == 'mmlu':
+                self._art_dir_name = os.path.join("runs", art_dir_name)
+            else:
+                self._art_dir_name = os.path.join("runs", "_pro", art_dir_name)
             os.makedirs(self._art_dir_name, exist_ok=True)
         else:
             self._art_dir_name = None
@@ -123,7 +126,7 @@ class Evaluator():
 
         assert self._swarm is not None
 
-        dataset = self._val_dataset
+        dataset = self._test_dataset
 
         print(f"Evaluating swarm on {dataset.__class__.__name__} split {dataset.split}")
 
@@ -288,7 +291,7 @@ class Evaluator():
         potential_connections = self._swarm.connection_dist.potential_connections
         
         ################################## Find and Set MDP (environment constructor) ########################
-        env_constructor = EnvConstructor(self._swarm, realized_graph, bert, tokenizer, train_dataset, val_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs, self.args.exploration_noise)
+        env_constructor = EnvConstructor(self._swarm, realized_graph, bert, tokenizer, train_dataset, val_dataset, test_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs, self.args.exploration_noise)
         
         # if self.args.train:
         #     train_env_constructor = EnvConstructor(realized_graph, train_dataset, self.args.train, num_pot_edges, num_nodes, num_node_features, self._swarm.connection_dist.node_features, self._swarm.connection_dist.state_indicator, self._swarm.connection_dist.node_id2idx, self._swarm.connection_dist.node_idx2id, self._swarm.connection_dist.edge_index, batch_size, self.args.num_envs)

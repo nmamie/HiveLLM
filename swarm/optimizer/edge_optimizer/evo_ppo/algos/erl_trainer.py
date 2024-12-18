@@ -327,8 +327,9 @@ class ERL_Trainer:
 		Returns:
 			float: Validation score
 		"""
-		if not self.args.train:             
+		if not self.args.train:         
 			model_state = torch.load(self.args.aux_folder + '_best'+self.args.savetag)
+			# model_state = torch.load(self.args.aux_folder + '_bestMMLU_pro_seed45_roll4_pop8_alpha0.1')
 			self.best_policy.load_state_dict(model_state['policy'])
 			# self._swarm.connection_dist.node_features = model_state['init']
 			# self._swarm.connection_dist.state_indicator = model_state['state']
@@ -341,15 +342,20 @@ class ERL_Trainer:
 		self.best_policy.to(self.device)
 		self.best_policy.eval()
 
-		env, num_envs = self.env_constructor.make_env(test=True, graph=self._realized_graph, node2idx=self._swarm.connection_dist.node_id2idx, idx2node=self._swarm.connection_dist.node_idx2id, node_features=self._swarm.connection_dist.node_features, state_indicator=self._swarm.connection_dist.state_indicator, edge_index=self._swarm.connection_dist.edge_index)
+		env, num_envs = self.env_constructor.make_env(train=False, test=True, graph=self._realized_graph, node2idx=self._swarm.connection_dist.node_id2idx, idx2node=self._swarm.connection_dist.node_idx2id, node_features=self._swarm.connection_dist.node_features, state_indicator=self._swarm.connection_dist.state_indicator, edge_index=self._swarm.connection_dist.edge_index)
 		# env.prune(self.pruned_nodes)
 		print(f"Pruned nodes: {self.pruned_nodes}")
 		accuracy = Accuracy()
   
+		# store the results in a dictionary
+		results = {}
+  
 		progress_bar = tqdm(total=limit_questions)
+		i = 0
 		while True:
 			print(80*'-')
 			state, edge_index, active_node_idx, record = await env.val_reset()
+			i += 1
 			print("Active node: ", active_node_idx)
 			# # remove pruned nodes from edge_index
 			# if len(self.pruned_nodes) > 0:
@@ -364,8 +370,22 @@ class ERL_Trainer:
 			while not done:
 				state = state.to(self.device)
 				edge_index = edge_index.to(self.device)
-				action = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence_emb, step=steps, pruned_nodes=[])
+				action, active_node_features, attention, q_values, heads = self.best_policy.clean_action(state, edge_index, active_node_idx, sentence_emb, step=steps, pruned_nodes=[], return_only_action=False)
 				print("Action:", action)
+				print("Q-values:", q_values)
+				print("State Value:", heads[0])
+				print("Advantage:", heads[1])
+				# print("Attention:", attention)
+				# print("Active node features:", active_node_features)
+				if steps == 0:
+					results[i] = {}
+				results[i][steps] = {
+					"action": action.item(),
+					"q_values": q_values.detach().cpu().numpy().tolist(),
+					"heads": heads,
+					"attention": attention,
+					"active_node_features": active_node_features.detach().cpu().numpy().tolist()
+				}
 				next_state, next_active_node_idx, reward, terminate, truncate, final_answers = await env.val_step(action, record, edge_index)
 				# state_copy = deepcopy(state.cpu().numpy())
 				# next_state_copy = deepcopy(next_state.cpu().numpy())
@@ -389,7 +409,13 @@ class ERL_Trainer:
 				break
 		print("Final accuracy:")
 		accuracy.print()
-
+  
+		# dump the results
+		if self._art_dir_name is not None:
+			results_torch_name = os.path.join(self._art_dir_name, "results.pth")
+			torch.save(results, results_torch_name)
+  
+		# dump the evaluation results
 		self._dump_eval_results(dict(
 			accuracy=accuracy.get(),
 			limit_questions=limit_questions))

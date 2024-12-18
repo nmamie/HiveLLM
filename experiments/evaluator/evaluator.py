@@ -39,7 +39,11 @@ class Evaluator():
                         (f"_{tensorboard_tag}" if tensorboard_tag is not None else ""))
 
         if enable_artifacts or enable_tensorboard:
-            self._art_dir_name = os.path.join("runs", art_dir_name)
+            print(f"Domain: {train_dataset.get_domain()}")
+            if train_dataset.get_domain() == 'mmlu':
+                self._art_dir_name = os.path.join("runs", art_dir_name)
+            else:
+                self._art_dir_name = os.path.join("runs", "_pro", art_dir_name)
             os.makedirs(self._art_dir_name, exist_ok=True)
         else:
             self._art_dir_name = None

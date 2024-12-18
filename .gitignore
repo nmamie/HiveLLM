@@ -180,6 +180,7 @@ vscode/
 .coveragec
 
 # vis
+/experiment_results/
 result/example.html
 example.html
 dataset/crosswords
@@ -192,6 +193,10 @@ dataset/gaia/gaia/utils/*.jsonl
 dataset/gaia/__MACOSX/
 
 /runs/
+/runs_add/
+/runs_old/
+
+experiments.ipynb
 
 transformers/
 

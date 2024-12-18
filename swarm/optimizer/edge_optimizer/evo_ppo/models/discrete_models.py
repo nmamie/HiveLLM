@@ -1,4 +1,4 @@
-from sympy import false
+from sympy import Q, false
 import torch
 import random
 import torch.nn as nn
@@ -56,10 +56,10 @@ class CategoricalGATPolicy(nn.Module):
         self.value_fc = nn.Linear(hidden_channels, 1)
         self.advantage_fc = nn.Linear(hidden_channels, action_dim)
 
-        # Normalization layer for embedding (optional)
-        self.norm_hidden = nn.LayerNorm(hidden_channels)
-        self.norm_features = nn.LayerNorm(hidden_channels * 2)
-        self.norm_attention = nn.LayerNorm(hidden_channels * num_heads)
+        # # Normalization layer for embedding (optional)
+        # self.norm_hidden = nn.LayerNorm(hidden_channels)
+        # self.norm_features = nn.LayerNorm(hidden_channels * 2)
+        # self.norm_attention = nn.LayerNorm(hidden_channels * num_heads)
 
         # Initialize weights
         self.apply(self.initialize_weights)
@@ -69,7 +69,7 @@ class CategoricalGATPolicy(nn.Module):
             if hasattr(m, 'weight') and m.weight is not None:
                 nn.init.xavier_uniform_(m.weight)
             if hasattr(m, 'bias') and m.bias is not None:
-                m.bias.data.fill_(0.0)
+                nn.init.constant_(m.bias, 0)
 
 
     def clean_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence_emb: torch.Tensor, return_only_action=True, step=0, pruned_nodes=[], batch_size=1):
@@ -82,16 +82,16 @@ class CategoricalGATPolicy(nn.Module):
         steps = steps.unsqueeze(1)
         steps = self.fc0(steps * 1e-2) # scale down the step size to avoid large values in the embedding
         steps = F.relu(steps)
-        steps = self.norm_hidden(steps)
-        sentence_embedding = F.normalize(sentence_emb, p=2, dim=1)
+        # steps = self.norm_hidden(steps)
+        # sentence_embedding = F.normalize(sentence_emb, p=2, dim=1)
         sentence_embedding = self.fc1(sentence_emb)
         sentence_embedding = F.relu(sentence_embedding)
-        sentence_embedding = self.norm_hidden(sentence_embedding)
+        # sentence_embedding = self.norm_hidden(sentence_embedding)
         sentence_embedding = sentence_embedding + steps
         sentence_embedding = self.fc2(sentence_embedding)
         sentence_embedding = F.relu(sentence_embedding)
         # normalize sentence embedding
-        sentence_embedding = self.norm_hidden(sentence_embedding)
+        # sentence_embedding = self.norm_hidden(sentence_embedding)
                 
         # sentence_embedding = sentence_embedding.unsqueeze(0)
         # if x.size(0) != sentence_embedding.size(0):
@@ -103,13 +103,13 @@ class CategoricalGATPolicy(nn.Module):
             x, edge_index, return_attention_weights=True)
         x = F.elu(x)
         
-        x = self.norm_attention(x)
+        # x = self.norm_attention(x)
 
         # x_res = x
         x, attention2 = self.conv2(
             x, edge_index, return_attention_weights=True)
         
-        x = self.norm_hidden(x)        
+        # x = self.norm_hidden(x)        
         
         # stack active node features for action prediction
         active_node_features = x[active_node_idx].unsqueeze(0)
@@ -120,49 +120,50 @@ class CategoricalGATPolicy(nn.Module):
         if active_node_features.size(0) != sentence_embedding.size(0):
             sentence_embedding = sentence_embedding.unsqueeze(0)
             active_node_features = torch.cat((active_node_features, sentence_embedding), dim=2)
-            active_node_features = self.norm_features(active_node_features)
+            # active_node_features = self.norm_features(active_node_features)
             active_node_features = active_node_features.squeeze(0)
         else:
             active_node_features = torch.cat((active_node_features, sentence_embedding), dim=1)
-            active_node_features = self.norm_features(active_node_features)
+            # active_node_features = self.norm_features(active_node_features)
             
         active_node_features = self.fc3(active_node_features)
         active_node_features = F.relu(active_node_features)
             
         # Normalize active node features
-        active_node_features = self.norm_hidden(active_node_features)
+        # active_node_features = self.norm_hidden(active_node_features)
         
         # Value and Advantage heads
         val = self.value_fc(active_node_features)
         adv = self.advantage_fc(active_node_features)
+        heads = (val, adv)
         
         # Q-Value
-        action_logits = val + adv - adv.mean()
-
-        # tanh activation for action logits
-        action_logits = F.tanh(action_logits)
+        q_values = val + adv - adv.mean()
+        print("Q-values:", q_values)
+        # # tanh activation for action logits
+        # q_values = F.tanh(q_values)
 
         # Apply argmax on the correct dimension
-        action = action_logits.argmax(dim=1)
+        action = q_values.argmax(dim=1)
 
         if return_only_action:
             return action
 
-        return action, x, attention, action_logits
+        return action, active_node_features, attention, q_values, heads
 
     def noisy_action(self, x: torch.Tensor, edge_index: torch.Tensor, active_node_idx: int, sentence: str, return_only_action=True, step: int=0, pruned_nodes=[], batch_size=1):
         
-        _, x, attention, logits = self.clean_action(
+        _, active_node_features, attention, q_values, val = self.clean_action(
             x, edge_index, active_node_idx, sentence, return_only_action=False, step=step, pruned_nodes=pruned_nodes, batch_size=batch_size)
 
-        dist = Categorical(logits=logits)
+        dist = Categorical(logits=q_values)
         action = dist.sample()
         action = action
 
         if return_only_action:
             return action
 
-        return action, x, attention, logits
+        return action, active_node_features, attention, q_values
 
     # def proj_residual(self, x_res, target_dim):
     #     """Projects the residual connection to match the target dimension."""

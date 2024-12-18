@@ -15,7 +15,7 @@ class GymWrapper:
 
     """
 
-    def __init__(self, swarm, graph, bert, tokenizer, train_dataset, val_dataset, train, test, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs, exploration_noise):
+    def __init__(self, swarm, graph, bert, tokenizer, train_dataset, val_dataset, test_dataset, train, test, num_pot_edges, num_nodes, num_node_features, node_features, state_indicator, node2idx, idx2node, edge_index, batch_size, num_envs, exploration_noise):
         """
         A base template for all environment wrappers.
         """
@@ -26,10 +26,13 @@ class GymWrapper:
         self.is_discrete = True
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
+        self.test_dataset = test_dataset
         self.train = train
         self.test = test
-        if self.test:
+        if self.test and self.train:
             self.dataset = self.val_dataset
+        elif self.test:
+            self.dataset = self.test_dataset
         else:
             self.dataset = self.train_dataset
         # self.loader = loader
@@ -59,6 +62,8 @@ class GymWrapper:
         #     self.loader = self._eval_loader(batch_size=1, dataset=self.dataset, limit_questions=153)
         
         self.loader = self._infinite_data_loader()
+        
+        print(f"Evaluating AI on {self.dataset.get_domain()} split {self.dataset.split}")
 
         print("Env Initialized")
 

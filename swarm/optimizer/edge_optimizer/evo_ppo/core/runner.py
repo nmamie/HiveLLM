@@ -74,7 +74,7 @@ def rollout_worker(id, type, task_pipe, result_pipe, store_data, model_bucket, e
                            
                 # ---- CALL GAT NETWORK FOR ACTION SELECTION ----
                 if type == 'pg': action, x, attention, logits = net.noisy_action(state, edge_index, active_node_idx, sentence_emb, return_only_action=False, step=steps, pruned_nodes=[])  # Choose an action from the policy network
-                else: action, x, attention, logits = net.clean_action(state, edge_index, active_node_idx, sentence_emb, return_only_action=False, step=steps, pruned_nodes=[])
+                else: action, x, attention, logits, val = net.clean_action(state, edge_index, active_node_idx, sentence_emb, return_only_action=False, step=steps, pruned_nodes=[])
                 
                 # # softmax
                 # print("Action logits:", logits)
