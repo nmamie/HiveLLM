@@ -1,4 +1,4 @@
-## Run the following commands to reproduce our experiments in the paper
+## Run the following commands to reproduce the experiments on HiveMind
 
 ### **MMLU**
 Run the baseline:
@@ -21,7 +21,29 @@ Run the main experiment with optimization and eventual evaluation:
 PYTHONPATH=. python experiments/run_mmlu.py --num-truthful-agents=3 --mode=OptimizedSwarm
 ```
 
-### **Mini Crosswords**
+### **MMLU-Pro**
+Run the baseline:
+```bash
+PYTHONPATH=. python experiments/run_mmlu_pro.py --mode=DirectAnswer
+```
+
+Run fully-connected swarm ablation:
+```bash
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=FullConnectedSwarm
+```
+
+Run randomly-connected swarm ablation:
+```bash
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=RandomSwarm
+```
+
+Run the main experiment with optimization and eventual evaluation:
+```bash
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm
+```
+
+
+<!-- ### **Mini Crosswords**
 Run the REINFORCE algorithm for edge optimization with three agents as described in the paper.
 ```bash
 PYTHONPATH=. python experiments/run_crosswords.py
@@ -36,5 +58,5 @@ PYTHONPATH=. python experiments/run_humaneval.py  --learn_demonstration True
 ### **GAIA**
 Run the general assistant tasks.
 ```bash
-PYTHONPATH=. python experiments/run_gaia.py
-```
+PYTHONPATH=. python experiments/run_gaia.py -->
+<!-- ``` -->
