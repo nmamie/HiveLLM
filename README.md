@@ -6,10 +6,12 @@
 [![Wechat](https://img.shields.io/badge/Wechat-7BB32E?logo=wechat&logoColor=white)](https://metauto.ai/images/wechat.jpeg)
 [![Coverage Status](https://coveralls.io/repos/github/metauto-ai/GPTSwarm/badge.svg?branch=main)](https://coveralls.io/github/metauto-ai/GPTSwarm?branch=main) -->
 
-🐝 **HiveMind is a graph-based framework for LLM-based agents, providing two high-level features:**
+# The Society of HiveMind
 
-* It lets you build LLM-based agents from graphs.
-* It enables the customized and automatic self-organization of agent swarms with self-improvement capabilities, following the evolutionary theories of Charles Darwin and Jean-Baptiste de Lamarck.
+🐝 **HiveMind is a graph-based framework for AI foundation model agents, providing two high-level features:**
+
+* It lets you build artificial agents from graphs.
+* It enables the customized and automatic self-organization of agent swarms with self-improvement capabilities.
 
 <p align="left">
 <a href=""><img src="assets/HiveMind.png" alt="HiveMind" width="600px"></a>
@@ -21,11 +23,12 @@ Here is the edge optimization process that updates edge probabilities toward imp
 
 <img src="assets/edge_opt_base.gif" alt="Edge optimization" width="400">
 
+
 ## About HiveMind
 
 <img src="assets/gpt_swarm.png" alt="Framework" width="799">
 
-At a granular level, HiveMind is a library that is built on [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) and includes the following components: 
+At a granular level, HiveMind is a library based on the excellent project [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) that includes the following components: 
 
 
 | Module | Description |
@@ -42,7 +45,7 @@ At a granular level, HiveMind is a library that is built on [GPTSwarm](https://g
 **Clone the repo**
 
 ```bash
-git clone https://github.com:nmamie/HiveLLM.git
+git clone https://github.com/nmamie/HiveLLM.git
 cd HiveLLM/
 ```
 
@@ -83,49 +86,27 @@ inputs = {"task": task, "files": files}
 danswer = swarm.run(inputs)
 ```
 
-<!-- Check out the minimal Swarm example in Colab here: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/metauto-ai/GPTSwarm/blob/main/notebooks/demo_swarm.ipynb).
-
-See how to create a custom Agent and run a Swarm with it here: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/metauto-ai/GPTSwarm/blob/main/notebooks/demo_custom_agent.ipynb).
-
-Here is a Youtube video on how to run the demo notebooks:
-
-[<img src="assets/youtube_preview.png" width="75%">](https://www.youtube.com/watch?v=QOLQse5ZBV8&t=8s&ab_channel=GPTSwarm "Running swarm inference") -->
-
-
 ## Experiments
 
-
+For a more advanced usage of this framework, see our [experiments using the Darwinian approach](https://github.com/nmamie/HiveLLM/tree/experimental_ga/experiments) and our [experiments using the Lamarckian approach](https://github.com/nmamie/HiveLLM/tree/experimental/experiments).
 
 
 ## Class diagram
 
 <img src="assets/class_diagram.png" alt="Edge optimization" width="700">
 
-## Example of the Swarm
+## Example of a Swarm
 
 <img src="assets/swarm_v3.png" alt="Edge optimization" width="500">
 
-<!-- ## More Visualizations
+## Acknowledgements
 
-<img src="assets/swarm_vis.png" alt="Edge optimization" width="800">
+We acknowledge the excellent projects by [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) and [Evolutionary-Reinforcement-Learning](https://github.com/ShawK91/Evolutionary-Reinforcement-Learning) that largely inspired the development of the Society of HiveMind.
 
-## Running with a local LLM
-
-We support local LM inference via [LM Studio](https://lmstudio.ai). Download their desktop app for Mac or Windows, choose a model from the Huggingface repository and start the server. Use `model_name='lmstudio'` in GPTSwarm code to run with the local LLM.
-
-<img src="assets/lm_studio.png" alt="Edge optimization" width="800"> -->
 
 ## Contributors
 
-<!-- <a href="https://github.com/metauto-ai/gptswarm/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=metauto-ai/gptswarm&max=200" />
-</a> -->
-
-* [Noah Mamie](https://nmamie.github.io/) (MSc Student @ UZH; RA @ ETHZ)
-
-
-## Acknowledgements
-This work is acknowledging the excellent projects of [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) and [Evolutionary-Reinforcement-Learning](https://github.com/ShawK91/Evolutionary-Reinforcement-Learning).
+* [Noah Mamie](https://nmamie.github.io/) (MSc in AI @ UZH; RA @ ETHZ)
 
 <!-- 
 ## Citation
@@ -137,7 +118,7 @@ Please cite our paper if you find the library useful or interesting.
   journal={arXiv preprint arXiv:2402.16823},
   year={2024}
 }
-``` -->
+```
 
 
 
