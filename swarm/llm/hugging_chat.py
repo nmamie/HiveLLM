@@ -18,134 +18,64 @@ from swarm.llm.llm_registry import LLMRegistry
 
 import torch
 import transformers
-# from optimum.nvidia.pipelines import pipeline
-from transformers import AutoTokenizer, LlamaForCausalLM, AutoModelForCausalLM
+from transformers import AutoTokenizer, LlamaForCausalLM, AutoModelForCausalLM, pipeline
 from accelerate import Accelerator
 
-
-# init
-# model_path = "nvidia/Llama-3.1-Minitron-4B-Width-Base"
-# tokenizer = AutoTokenizer.from_pretrained(model_path)
-
-# device = 'cuda'
-# dtype = torch.bfloat16
-# model = LlamaForCausalLM.from_pretrained(model_path, torch_dtype=dtype, device_map=device)
-
-# models = []
-# for i in range(1):
-#     models.append(transformers.pipeline(
-#         "text-generation",
-#         model=model_id,
-#         device_map="auto",
-#     ))
-# models = []
-# devices = [0,1,2,3]
-# for i in range(10):
-# model = AutoModelForCausalLM.from_pretrained(
-#         "OuteAI/Lite-Oute-2-Mamba2Attn-Instruct",
-#         # To allow custom modeling files
-#         trust_remote_code=True,
-
-#         # If you have installed flash attention 2
-#         attn_implementation="flash_attention_2",
-#         torch_dtype=torch.bfloat16,
-#     )
-# tokenizer = AutoTokenizer.from_pretrained("OuteAI/Lite-Oute-2-Mamba2Attn-Instruct")
-# model = transformers.AutoModelForCausalLM.from_pretrained(
-#     model_id,
-#     torch_dtype=torch.bfloat16,
-#     device_map="auto",
-#     force_download=True  # This forces the download of the latest model checkpoint
-# )
-
-# hf_pipeline2 = transformers.pipeline(
-#         "text-generation",
-#         model="meta-llama/Meta-Llama-3-8B-Instruct",
-#         model_kwargs={
-#             "torch_dtype": torch.bfloat16,
-#                     },
-#         # trust_remote_code=True,
-#         device_map="auto",
-#     )
-                                                                                                        # hf_pipeline3 = transformers.pipeline(
-                                                                                                        #         "text-generation",
-                                                                                                        #         model="unsloth/Meta-Llama-3.1-8B-bnb-4bit",
-                                                                                                        #         # trust_remote_code=True,
-                                                                                                        #         device_map="auto",
-                                                                                                        #     )
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# devices = [0,1,2,3]
-# models = {}
-# for i in range(10):
-#     model = AutoModelForCausalLM.from_pretrained(
-#         "OuteAI/Lite-Oute-2-Mamba2Attn-Instruct",
-#         # To allow custom modeling files
-#         trust_remote_code=True,
-
-#         # If you have installed flash attention 2
-#         attn_implementation="flash_attention_2",
-#         torch_dtype=torch.bfloat16,
-#     )
-#     device = random.choice(devices)
-#     model.to("cuda:{}".format(device))
-#     tokenizer = AutoTokenizer.from_pretrained("OuteAI/Lite-Oute-2-Mamba2Attn-Instruct")
-#     models[device] = model
-# model = AutoModelForCausalLM.from_pretrained(
-#         "OuteAI/Lite-Oute-2-Mamba2Attn-Instruct",
-#         # To allow custom modeling files
-#         trust_remote_code=True,
-
-#         # If you have installed flash attention 2
-#         attn_implementation="flash_attention_2",
-#         torch_dtype=torch.bfloat16,
-#     )
-# device = 3
-# model.to("cuda:{}".format(device))
-# tokenizer = AutoTokenizer.from_pretrained("OuteAI/Lite-Oute-2-Mamba2Attn-Instruct")
-model = None
+models = None
 curr_inf = False
 
 def load_model(inference: bool = False):
     if inference is True:
         # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
-        model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        model_id1 = "meta-llama/Llama-3.2-3B-Instruct"
+        model_id2 = "Qwen/Qwen2.5-3B-Instruct"
         # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     else:
         # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
-        model_id = "meta-llama/Llama-3.2-3B-Instruct"
+        model_id1 = "meta-llama/Llama-3.2-3B-Instruct"
+        model_id2 = "Qwen/Qwen2.5-3B-Instruct"
+        # model_id2 = "Qwen/Qwen2.5-7B-Instruct"
         # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
-    # models = []
+    
+    print("model_id1:", model_id1)
+    print("model_id2:", model_id2)
 
-    hf_pipeline = transformers.pipeline(
+    try:
+        print("Loading model 1...")
+        hf_pipeline1 = pipeline(
             "text-generation",
-            model=model_id,
-            model_kwargs={
-                "torch_dtype": torch.bfloat16,
-                        },
-            # trust_remote_code=True,
+            model=model_id1,
+            torch_dtype="auto",
             device_map="auto",
         )
-    
-    # hf_pipeline2 = transformers.pipeline(
-    #         "text-generation",
-    #         model=model_id2,
-    #         model_kwargs={
-    #             "torch_dtype": torch.bfloat16,
-    #                     },
-    #         # trust_remote_code=True,
-    #         device_map="auto",
-        # )
+        print("Model 1 loaded!")
+    except Exception as e:
+        print("Error loading model 1:", e)
 
-    accelerator = Accelerator()
+    try:
+        print("Loading model 2...")
+        hf_pipeline2 = pipeline(
+            "text-generation",
+            model=model_id2,
+            torch_dtype="auto",
+            device_map="auto",
+        )
+        print("Model 2 loaded!")
+    except Exception as e:
+        print("Error loading model 2:", e)
+
+
+    # accelerator = Accelerator()
+    pipelines = []
     
-    model = accelerator.prepare(hf_pipeline)
+    # model1 = accelerator.prepare(hf_pipeline1)
     # model2 = accelerator.prepare(hf_pipeline2)
-    # models.append(model1)
-    # models.append(model2)
+    pipelines.append(hf_pipeline1)
+    pipelines.append(hf_pipeline2)
     
-    print('Model loaded')
-    return model
+    
+    return pipelines
 
 # import pdb; pdb.set_trace()
 
@@ -155,18 +85,22 @@ def hugging_chat(
     model_name,
     messages: List[str],
     max_tokens: int = 30,
-    temperature: float = 0.2,
+    temperature: float = 0.0,
+    model_id: int = 1,
     num_comps=1,
     return_cost=False,
 ) -> Union[List[str], str]:
-    global model
+    global models
     if messages[0] == '$skip$':
         return ''
 
     formatted_messages = [asdict(message) for message in messages]
     
-    if model is None:
-        model = load_model(inference=False)
+    print('Formatted messages:', formatted_messages)
+    if models is None:
+        print('Loading models...')
+        models = load_model(inference=False)
+        print('Models loaded')
     
     if temperature > 0.0:
         do_sample = True
@@ -178,17 +112,35 @@ def hugging_chat(
         temperature = None
         repetition_penalty = None
                         
-    assert model is not None, "Model not loaded"
+    assert models is not None, "Models not loaded"
+    
+    # randomly get number 0 or 1
+    rand_num = random.randint(0, 1)
+    model = models[rand_num]
     
     try:
-        response = model(
-            formatted_messages,
-            max_new_tokens=max_tokens,
-            pad_token_id = model.tokenizer.eos_token_id,
-            do_sample=do_sample,
-            top_p=top_p,
-            temperature=temperature,
-        )
+        if rand_num == 0:
+            response = model(
+                formatted_messages,
+                max_new_tokens=max_tokens,
+                pad_token_id = model.tokenizer.eos_token_id,
+                do_sample=do_sample,
+                top_p=top_p,
+                temperature=temperature,
+            )
+        else:
+            tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct")
+            text = tokenizer.apply_chat_template(
+                formatted_messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+            generated_ids = model.generate(
+                **model_inputs,
+                max_new_tokens=max_tokens
+            )
         
     except Exception as e:
         print(f"Error: {e}")
@@ -200,20 +152,23 @@ def hugging_chat(
 
     cost_count(response, model_name)
 
-    return [resp["generated_text"][-1]['content'] for resp in response]
-        
+    if rand_num == 0:
+        return [resp["generated_text"][-1]['content'] for resp in response]
+    else:
+        return tokenizer.decode(generated_ids[0], skip_special_tokens=True)
 
 @retry(wait=wait_random_exponential(max=100), stop=stop_after_attempt(10))
 async def hugging_achat(
     model_name,
     messages: List[str],
     max_tokens: int = 30,
-    temperature: float = 0.2,
+    temperature: float = 0.0,
+    model_id: int = 1,
     inference: bool = False,
     num_comps=1,
     return_cost=False,
 ) -> Union[List[str], bool]:
-    global model
+    global models
     global curr_inf
     if messages[0] == '$skip$':
         return ''
@@ -225,9 +180,9 @@ async def hugging_achat(
     # input_ids = tokenizer.apply_chat_template(
     #     formatted_messages, add_generation_prompt=True, return_tensors="pt"
     # ).to(device)
-    
-    if model is None or curr_inf != inference:
-        model = load_model(inference=inference)
+    if models is None or curr_inf != inference:
+        print("Loading models...")
+        models = load_model(inference=inference)
         curr_inf = inference
     
     if temperature > 0.0:
@@ -240,12 +195,15 @@ async def hugging_achat(
         temperature = None
         repetition_penalty = None
             
-    assert model is not None, "Model not loaded"
+    assert models is not None, "Models not loaded"
     
-    # model = random.choice(models)
+    # randomly get number 0 or 1
+    # rand_num = random.randint(0, 1)
+    model = models[model_id]
 
     try:
         with async_timeout.timeout(20):
+            # if rand_num == 0:
             response = model(
                 formatted_messages,
                 max_new_tokens=max_tokens,
@@ -256,6 +214,19 @@ async def hugging_achat(
                 # repetition_penalty=repetition_penalty,
                 # batch_size=4, 
             )
+            # else:
+            #     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B-Instruct")
+            #     text = tokenizer.apply_chat_template(
+            #         formatted_messages,
+            #         tokenize=False,
+            #         add_generation_prompt=True
+            #     )
+            #     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+            #     generated_ids = model.generate(
+            #         **model_inputs,
+            #         max_new_tokens=max_tokens
+            #     )
             
     except asyncio.TimeoutError:
         print('Timeout')
@@ -287,6 +258,7 @@ class HuggingChat(LLM):
         messages: List[str],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        model_id: Optional[int] = None,
         inference: Optional[bool] = None,
         num_comps: Optional[int] = None,
         ) -> Union[List[str], str]:
@@ -295,6 +267,8 @@ class HuggingChat(LLM):
             max_tokens = self.DEFAULT_MAX_TOKENS
         if temperature is None:
             temperature = self.DEFAULT_TEMPERATURE
+        if model_id is None:
+            model_id = 1
         if inference is None:
             inference = self.DEFAULT_INFERENCE
         if num_comps is None:
@@ -307,6 +281,7 @@ class HuggingChat(LLM):
                                 messages,
                                 max_tokens,
                                 temperature,
+                                model_id,
                                 inference,
                                 num_comps)
 
@@ -315,6 +290,7 @@ class HuggingChat(LLM):
         messages: List[str],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        model_id: Optional[int] = None,
         num_comps: Optional[int] = None,
         ) -> Union[List[str], str]:
 
@@ -322,6 +298,8 @@ class HuggingChat(LLM):
             max_tokens = self.DEFAULT_MAX_TOKENS
         if temperature is None:
             temperature = self.DEFAULT_TEMPERATURE
+        if model_id is None:
+            model_id = 1
         if num_comps is None:
             num_comps = self.DEFUALT_NUM_COMPLETIONS
 
@@ -332,4 +310,5 @@ class HuggingChat(LLM):
                         messages,
                         max_tokens,
                         temperature,
+                        model_id,
                         num_comps)

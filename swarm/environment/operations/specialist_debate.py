@@ -28,43 +28,53 @@ class SpecialistDebate(Node):
     role_list = [
         {
             "role": "Interdisciplinary Synthesizer",
-            "description": "Integrate knowledge across fields to provide a comprehensive answer. Encourage other roles to consider interdisciplinary perspectives and avoid overly narrow conclusions."
+            "description": "Integrate knowledge across fields to provide a comprehensive answer. Encourage other roles to consider interdisciplinary perspectives and avoid overly narrow conclusions.",
+            "model_id": 0
         },
         {
             "role": "Critical Thinker",
-            "description": "Approach questions with skepticism and challenge assumptions rigorously. Question the validity and soundness of other responses, encouraging a critical examination of all conclusions."
+            "description": "Approach questions with skepticism and challenge assumptions rigorously. Question the validity and soundness of other responses, encouraging a critical examination of all conclusions.",
+            "model_id": 0
         },
         {
             "role": "Scientist",
-            "description": "You are a scientist with expertise in empirical research and experimentation. Provide answers based on scientific evidence and encourage other roles to consider empirical data."
+            "description": "You are a scientist with expertise in empirical research and experimentation. Provide answers based on scientific evidence and encourage other roles to consider empirical data.",
+            "model_id": 1
         },
         {
             "role": "Educator",
-            "description": "You are an educator with expertise in explaining complex ideas in simple terms. Encourage other roles to be clear in their answers, helping the overall response be more understandable."
+            "description": "You are an educator with expertise in explaining complex ideas in simple terms. Encourage other roles to be clear in their answers, helping the overall response be more understandable.",
+            "model_id": 0
         },
         {
             "role": "Mathematician",
-            "description": "You are a mathematician with expertise in solving complex mathematical problems. Approach questions with mathematical rigor and precision, and encourage rigorous validation from other roles."
-        },
-        {
-            "role": "Fact Checker",
-            "description": "You are a meticulous fact-checker. Verify the correctness of other agents' answers and challenge any inaccuracies or unsupported claims."
+            "description": "You are a mathematician with expertise in solving complex mathematical problems. Approach questions with mathematical rigor and precision, and encourage rigorous validation from other roles.",
+            "model_id": 1
         },
         {
             "role": "Philosopher",
-            "description": "You are a philosopher skilled in analyzing abstract concepts. Provide responses by considering various philosophical frameworks, and encourage other roles to think beyond the surface level."
+            "description": "You are a philosopher skilled in analyzing abstract concepts. Provide responses by considering various philosophical frameworks, and encourage other roles to think beyond the surface level.",
+            "model_id": 0
+        },
+        {
+            "role": "Fact Checker",
+            "description": "You are a meticulous fact-checker. Verify the correctness of other agents' answers and challenge any inaccuracies or unsupported claims.",
+            "model_id": 1
         },
         {
             "role": "Psychologist",
-            "description": "You are a psychologist with expertise in human behavior and mental processes. Provide answers based on psychological theories and encourage other roles to consider human psychology."
+            "description": "You are a psychologist with expertise in human behavior and mental processes. Provide answers based on psychological theories and encourage other roles to consider human psychology.",
+            "model_id": 0
         },
         {
             "role": "Engineer",
-            "description": "You are an engineer with expertise in designing and building systems. Provide practical solutions to problems and encourage other roles to consider engineering principles."
+            "description": "You are an engineer with expertise in designing and building systems. Provide practical solutions to problems and encourage other roles to consider engineering principles.",
+            "model_id": 1
         },
         {
             "role": "Trend Analyzer",
-            "description": "Identify patterns and trends, using historical and current data to predict outcomes. Encourage other roles to consider the likelihood of outcomes based on trend data."
+            "description": "Identify patterns and trends, using historical and current data to predict outcomes. Encourage other roles to consider the likelihood of outcomes based on trend data.",
+            "model_id": 1
         }
     ]
 
@@ -83,6 +93,7 @@ class SpecialistDebate(Node):
         self.role_info = self.role_list[idx_role]
         self.role = self.role_info["role"]
         self.role_description = self.role_info["description"]
+        self.model_id = self.role_info["model_id"]
 
         self.llm = LLMRegistry.get(self.role)
         self.max_token = max_token
@@ -136,7 +147,7 @@ class SpecialistDebate(Node):
         if len(opinions) > 0:
             user_message = f"""{user_message}
 
-Take into account the following opinions which may or may not be true:
+Take into account the following opinions which may or may not be true and reflect them in your answer:
 
 {opinions}"""
 
@@ -145,7 +156,7 @@ Take into account the following opinions which may or may not be true:
 
         message = [Message(role="system", content=system_message),
                    Message(role="user", content=user_message)]
-        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
+        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.0, model_id=self.model_id)
 
         execution = {
             "operation": self.node_name,

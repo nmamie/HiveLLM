@@ -36,10 +36,10 @@ class EdgeWiseDistribution(ConnectDistribution):
                  initial_probability: float = 0.5,
                  ):
         super().__init__(potential_connections)
-        # init_logit = torch.log(torch.tensor(initial_probability / (1 - initial_probability)))
-        # init_tensor = torch.ones(
-        #     len(potential_connections)) * init_logit
-        # self.edge_logits = torch.nn.Parameter(init_tensor)
+        init_logit = torch.log(torch.tensor(initial_probability / (1 - initial_probability)))
+        init_tensor = torch.ones(
+            len(potential_connections)) * init_logit
+        self.edge_logits = torch.nn.Parameter(init_tensor, requires_grad=True)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         node_ids = set([x for pair in potential_connections for x in pair])
         self.node_idx2id = {i: node_id for i, node_id in enumerate(node_ids)}
@@ -48,7 +48,8 @@ class EdgeWiseDistribution(ConnectDistribution):
         self.order_params = order_tensor
         # self.node_features = torch.randn(len(node_ids), 16, requires_grad=False)
         self.node_features = torch.randn(len(node_ids), 64, requires_grad=False)
-        self.gat = GATWithSentenceEmbedding(num_node_features=64, hidden_channels=8, sentence_embedding_dim=64, num_heads=8).to(self.device)
+        self.baseline = torch.nn.Parameter(torch.randn(1, requires_grad=True))
+        self.gat = GATWithSentenceEmbedding(num_potential_edges=potential_connections, num_node_features=64, hidden_channels=8, sentence_embedding_dim=64, num_heads=8).to(self.device)
         # self.link_predictor = LinkPredictor(in_channels=16).to(self.device)
         # edge index
         edges = self.potential_connections
@@ -219,49 +220,18 @@ class EdgeWiseDistribution(ConnectDistribution):
         x = node_features
         print("Node features shape:", x.shape)
         edge_index = deepcopy(self.edge_index)
-        # edge_probs = self.link_predictor(x[self.edge_index[0]], x[self.edge_index[1]], init=True)
-        # print(f"Edge probs before: {edge_probs}")
-
-        # edge_sim = torch.nn.functional.cosine_similarity(x[orig_edge_index[0]], x[orig_edge_index[1]], dim=1)
-        # # Define a threshold to create edges based on similarity
-        # edges = []
-        # for i, prob in enumerate(edge_sim):
-        #     if prob > torch.rand(1).to(self.device):
-        #         edges.append(self.edge_index[:, i].tolist())
-        #         edges.append(self.edge_index[:, i].tolist()[::-1])
-
-        # # Convert edges to tensor format
-        # edge_index = torch.tensor(edges, dtype=torch.long).t()
-        # print(f"Edge index: {edge_index}")
-        # print(f"ORIGINAL EDGE INDEX: {self.edge_index}")
         
-        # if len(edge_index) == 0:
-        #     return _graph, torch.tensor([0.0]), torch.tensor([0.0]), torch.tensor([0.0])
-                
-        # with torch.no_grad():
-        edge_logits = self.gat(x, edge_index, query)
+        edge_logits, orig_edge_logits = self.gat(x, edge_index, query)
         edge_logits = edge_logits.cpu()
-        # edge_probs = self.link_predictor(node_embeddings[self.edge_index[0]], node_embeddings[self.edge_index[1]])
-        # # calculate cosine similarity
-        # node_embeddings = node_embeddings.detach().cpu()
-        # edge_matrix = cosine_similarity(x[self.edge_index[0]], x[self.edge_index[1]])
-        # edge_probs = []
-        # for i, j in zip(self.edge_index[0], self.edge_index[1]):
-        #     if i != j:
-        #         edge_probs.append(abs(edge_matrix[i][j]))
-        # print(f"Edge probs after: {edge_probs}")
-        # edge_probs = torch.tensor(edge_probs)     
-        # edge_mask = []
-        # for prob in edge_probs:
-        #     edge_mask.append(prob > torch.rand(1).to(self.device))
-        # edge_mask = torch.stack(edge_mask)
+        orig_edge_logits = orig_edge_logits.cpu()
         
-        log_probs = [torch.tensor([0.0])]
-        # reverse the sigmoid for edge probs, handle the case where edge_probs is 0 or 1
-        # edge_probs = torch.sigmoid(edge_logits)
+        log_probs = []
+        log_edge_probs = []
+        
         edge_probs = edge_logits
+        
         # print(f"Edge probs after sigmoid: {edge_probs}")
-        for i, (potential_connection, edge_logit) in enumerate(zip(self.potential_connections, edge_logits)):
+        for i, (potential_connection, edge_logit, orig_edge_logit) in enumerate(zip(self.potential_connections, edge_logits, orig_edge_logits)):
             out_node = _graph.find_node(potential_connection[0])
             in_node = _graph.find_node(potential_connection[1])
 
@@ -271,20 +241,26 @@ class EdgeWiseDistribution(ConnectDistribution):
             if not _graph.check_cycle(in_node, {out_node}, set()):
                 # edge_prob = torch.sigmoid(edge_logit / temperature)
                 edge_prob = edge_logit
+                log_edge_prob = torch.sigmoid(orig_edge_logit / temperature)
                 # if is_edge:
                 #     out_node.add_successor(in_node)
                 #     in_node.add_predecessor(out_node)
                 if threshold > 0.0:
                     edge_prob = torch.tensor(1 if edge_prob > threshold else 0)
+                    log_edge_prob = torch.tensor(1 if log_edge_prob > threshold else 0)
                 if torch.rand(1) < edge_prob:
                     out_node.add_successor(in_node)
                     # in_node.add_predecessor(out_node)
                     log_probs.append(torch.log(edge_prob))
+                    log_edge_probs.append(torch.log(log_edge_prob))
                 else:
                     log_probs.append(torch.log(1 - edge_prob))
-        
+                    log_edge_probs.append(torch.log(1 - log_edge_prob))
+
         if threshold > 0.0:
             log_probs = torch.tensor([0.0])
+            log_edge_probs = torch.tensor([0.0])
         else:
             log_probs = torch.sum(torch.stack(log_probs))
-        return _graph, edge_probs, log_probs, edge_logits
+            log_edge_probs = torch.sum(torch.stack(log_edge_probs))
+        return _graph, edge_probs, log_probs, log_edge_probs

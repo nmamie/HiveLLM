@@ -18,20 +18,26 @@ PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=R
 
 #####################OPTIMIZATION EXPERIMENTS#####################
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --adversarial --beta 0.0 --num-iterations 100
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --adversarial --beta 0.0 --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --random-string --beta 0.0 --num-iterations 100
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --random-string --beta 0.0 --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --beta 0.0 --num-iterations 100
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --beta 0.0 --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --adversarial --num-iterations 100
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --adversarial --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --random-string --num-iterations 100
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --random-string --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --num-iterations 100
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --optimizer=ga --adversarial --num-iterations 50
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --optimizer=ga --adversarial --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --optimizer=ga --random-string --num-iterations 50
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --optimizer=ga --random-string --num-iterations 60
 
-PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --optimizer=ga --num-iterations 50
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --optimizer=ga --num-iterations 60
+
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=3 --mode=OptimizedSwarm --optimizer=gat --adversarial --num-iterations 60 --lr 0.005
+
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --optimizer=gat --random-string --num-iterations 60 --lr 0.005
+
+PYTHONPATH=. python experiments/run_mmlu_pro.py --num-truthful-agents=6 --mode=OptimizedSwarm --optimizer=gat --num-iterations 60 --lr 0.005

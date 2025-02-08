@@ -16,6 +16,7 @@ class LLM(ABC):
         messages: List[Message],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        model_id: Optional[int] = None,
         inference: Optional[bool] = False,
         num_comps: Optional[int] = None,
         ) -> Union[List[str], str]:
@@ -28,6 +29,7 @@ class LLM(ABC):
         messages: List[Message],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        model_id: Optional[int] = None,
         num_comps: Optional[int] = None,
         ) -> Union[List[str], str]:
 

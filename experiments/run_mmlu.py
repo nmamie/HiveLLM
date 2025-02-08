@@ -40,7 +40,7 @@ def parse_args():
                         help="Domain (the same as dataset name), default 'MMLU'")
     
     parser.add_argument('--optimizer', type=str, default="gradient",
-                        choices=['gradient', 'ga'],
+                        choices=['gradient', 'ga', 'gat'],
                         help="Optimizer for the swarm. Default 'gradient'.")
     
     parser.add_argument('--lr', type=float, default=0.1,
@@ -66,9 +66,11 @@ async def main():
 
     args = parse_args()
     
-    assert args.optimizer in ['gradient', 'ga']
+    assert args.optimizer in ['gradient', 'ga', 'gat']
     if args.optimizer == 'gradient':
         from experiments.evaluator.evaluator import Evaluator
+    elif args.optimizer == 'gat':
+        from experiments.evaluator.evaluator_rl import Evaluator
     else:
         from experiments.evaluator.evaluator_ga import Evaluator
         
