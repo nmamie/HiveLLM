@@ -1,11 +1,3 @@
-<!-- [![Page](https://img.shields.io/badge/Project-Page-lightgreen.svg)](https://gptswarm.org)
-[![arXiv](https://img.shields.io/badge/arXiv-Paper-gold.svg)](https://arxiv.org/abs/2402.16823)
-[![License](https://img.shields.io/badge/License-MIT-orange.svg)](https://github.com/metauto-ai/GPTSwarm/blob/main/LICENSE)
-[![Issues](https://img.shields.io/github/issues/metauto-ai/GPTSwarm?color=00afaa)](https://github.com/metauto-ai/gptswarm/issues)
-[![Twitter Follow](https://img.shields.io/twitter/follow/AI_KAUST?style=social)](https://twitter.com/AI_KAUST)
-[![Wechat](https://img.shields.io/badge/Wechat-7BB32E?logo=wechat&logoColor=white)](https://metauto.ai/images/wechat.jpeg)
-[![Coverage Status](https://coveralls.io/repos/github/metauto-ai/GPTSwarm/badge.svg?branch=main)](https://coveralls.io/github/metauto-ai/GPTSwarm?branch=main) -->
-
 # The Society of HiveMind
 
 🐝 **HiveMind is a graph-based framework for AI foundation model agents, providing two high-level features:**
@@ -101,10 +93,5 @@ We acknowledge the excellent projects by [GPTSwarm](https://github.com/metauto-a
 ## Citation
 Please cite our paper if you find the library useful or interesting.
 ```
-@article{zhuge2024language,
-  title={Language Agents as Optimizable Graphs},
-  author={Zhuge, Mingchen and Wang, Wenyi and Kirsch, Louis and Faccio, Francesco and Khizbullin, Dmitrii and Schmidhuber, Jurgen},
-  journal={arXiv preprint arXiv:2402.16823},
-  year={2024}
-}
+@article{}
 ``` -->
