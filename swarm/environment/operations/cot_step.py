@@ -78,7 +78,7 @@ class CoTStep(Node):
             message = [
                 Message(role="system", content=system_prompt),
                 Message(role="user", content=user_prompt)]
-            response = await self.llm.agen(message, max_tokens=50)
+            response = await self.llm.agen(message, max_tokens=50, temperature=0.0, inference=inference, model_id=1)
             if self.is_last_step:
                 concatenated_response = response
             else:

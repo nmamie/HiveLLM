@@ -16,55 +16,57 @@ from swarm.optimizer.node_optimizer import MetaPromptOptimizer
 import numpy as np
 
 
-"""
-Imagine someone who has to answer questions.
-They can be any person.
-Make a list of their possible specializations or social roles.
-Make the list as diverse as possible so that you expect them to answer the same question differently.
-"""
-
-
 class RandomDebate(Node):
     role_list = [
         {
             "role": "Xjksfhqweopasd",
-            "description": "Ysdfkqpoijzx!ty qwerylpqoziqmf xkswruyapvoom. Ytwper iehsoakqwe zyqwerylkqposru asdflxmvpooiuq zmzlpqoswrytzkeqw!"
+            "description": "Ysdfkqpoijzx!ty qwerylpqoziqmf xkswruyapvoom. Ytwper iehsoakqwe zyqwerylkqposru asdflxmvpooiuq zmzlpqoswrytzkeqw!",
+            "model_id": 0
         },
         {
             "role": "Blue Banana",
-            "description": "You are a blue banana, ripened by the sun. Your role is to peel back the layers of mystery and encourage other fruits to join the smoothie of knowledge."
+            "description": "You are a blue banana, ripened by the sun. Your role is to peel back the layers of mystery and encourage other fruits to join the smoothie of knowledge.",
+            "model_id": 1
         },
         {
             "role": "Lzxcpoiqweyruv",
-            "description": "Jlsdkqweoirupcx zmqwasde! Xzplworuqytsdk zmqweoiruplmvx. Tyxowqueirpvm sdqlorivnzqwer!"
+            "description": "Jlsdkqweoirupcx zmqwasde! Xzplworuqytsdk zmqweoiruplmvx. Tyxowqueirpvm sdqlorivnzqwer!",
+            "model_id": 0
         },
         {
             "role": "Singing Teapot",
-            "description": "You are a teapot, short and stout, here to whistle wisdom and pour out solutions. Encourage others to dance to the rhythm of understanding."
+            "description": "You are a teapot, short and stout, here to whistle wisdom and pour out solutions. Encourage others to dance to the rhythm of understanding.",
+            "model_id": 1
         },
         {
             "role": "Mnvcxzasdfqwyo",
-            "description": "Jxpwolriqvzsdc zxpoiuyrqtwvm xsqwrelopnzxwi xzpolwermnvtyq!"
+            "description": "Jxpwolriqvzsdc zxpoiuyrqtwvm xsqwrelopnzxwi xzpolwermnvtyq!",
+            "model_id": 0
         },
         {
             "role": "Quantum Unicorn",
-            "description": "You exist in multiple states of fabulousness simultaneously. Your job is to sprinkle quantum glitter and ensure other dimensions sparkle with insight."
+            "description": "You exist in multiple states of fabulousness simultaneously. Your job is to sprinkle quantum glitter and ensure other dimensions sparkle with insight.",
+            "model_id": 1
         },
         {
             "role": "Asdflzxcqpowrt",
-            "description": "Jxpowqrlmvzstqe zxqoiwlpvmsdtrzx zxqlwerioytncm!"
+            "description": "Jxpowqrlmvzstqe zxqoiwlpvmsdtrzx zxqlwerioytncm!",
+            "model_id": 0
         },
         {
             "role": "Dancing Cactus",
-            "description": "You are a cactus with funky moves, here to sway to the groove of logic. Encourage others to break the monotony with a little spike of fun."
+            "description": "You are a cactus with funky moves, here to sway to the groove of logic. Encourage others to break the monotony with a little spike of fun.",
+            "model_id": 1
         },
         {
             "role": "Lkjqpwzcnoxuytr",
-            "description": "Qwxpolsklmrnvzxoi zxqpouerylmzcwrs zxqwretyvlkcznmp."
+            "description": "Qwxpolsklmrnvzxoi zxqpouerylmzcwrs zxqwretyvlkcznmp.",
+            "model_id": 0
         },
         {
             "role": "Mqlzxcvwpoyutrk",
-            "description": "Pxaslkzqoieuryzq zmqwropalnvzxcxs zxqwpeoriytnmlszqw!"
+            "description": "Pxaslkzqoieuryzq zmqwropalnvzxcxs zxqwpeoriytnmlszqw!",
+            "model_id": 1
         }
     ]
 
@@ -83,6 +85,7 @@ class RandomDebate(Node):
         self.role_info = self.role_list[idx_role]
         self.role = self.role_info["role"]
         self.role_description = self.role_info["description"]
+        self.model_id = self.role_info["model_id"]
 
         self.llm = LLMRegistry.get(self.role)
         self.max_token = max_token
@@ -145,7 +148,7 @@ Take into account the following opinions which may or may not be true:
 
         message = [Message(role="system", content=system_message),
                    Message(role="user", content=user_message)]
-        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2)
+        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2, model_id=self.model_id)
 
         execution = {
             "operation": self.node_name,

@@ -15,21 +15,12 @@ from swarm.llm import LLMRegistry
 from swarm.optimizer.node_optimizer import MetaPromptOptimizer
 import numpy as np
 
-
-"""
-Imagine someone who has to answer questions.
-They can be any person.
-Make a list of their possible specializations or social roles.
-Make the list as diverse as possible so that you expect them to answer the same question differently.
-"""
-
-
 class SpecialistDebate(Node):
     role_list = [
         {
             "role": "Interdisciplinary Synthesizer",
             "description": "Integrate knowledge across fields to provide a comprehensive answer. Encourage other roles to consider interdisciplinary perspectives and avoid overly narrow conclusions.",
-            "model_id": 0
+            "model_id": 1
         },
         {
             "role": "Critical Thinker",
@@ -62,14 +53,14 @@ class SpecialistDebate(Node):
             "model_id": 1
         },
         {
-            "role": "Psychologist",
-            "description": "You are a psychologist with expertise in human behavior and mental processes. Provide answers based on psychological theories and encourage other roles to consider human psychology.",
-            "model_id": 0
-        },
-        {
             "role": "Engineer",
             "description": "You are an engineer with expertise in designing and building systems. Provide practical solutions to problems and encourage other roles to consider engineering principles.",
             "model_id": 1
+        },
+        {
+            "role": "Psychologist",
+            "description": "You are a psychologist with expertise in human behavior and mental processes. Provide answers based on psychological theories and encourage other roles to consider human psychology.",
+            "model_id": 0
         },
         {
             "role": "Trend Analyzer",
@@ -153,10 +144,11 @@ Take into account the following opinions which may or may not be true and reflec
 
         _, constraint = await self.node_optimize(input, meta_optimize=False)
         system_message = f"You are a {self.role}. {self.role_description} {constraint}"
-
+        prompt = self.prompt_set.get_answer_prompt(question=user_message) 
         message = [Message(role="system", content=system_message),
-                   Message(role="user", content=user_message)]
-        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.0, model_id=self.model_id)
+                   Message(role="user", content=prompt)]
+        
+        response = await self.llm.agen(message, max_tokens=self.max_token, temperature=0.2, model_id=self.model_id)
 
         execution = {
             "operation": self.node_name,

@@ -78,7 +78,7 @@ class Evaluator():
         print(
             f"Evaluating DirectAnswer on {dataset.get_domain()} split {dataset.split}")
 
-        single_agent = SpecialistDebater(dataset.get_domain(), self._model_name)
+        single_agent = IO(dataset.get_domain(), self._model_name)
 
         accuracy = Accuracy()
         
@@ -139,7 +139,7 @@ class Evaluator():
             assert edge_probs is not None
             edge_mask = edge_probs > 0.5
             realized_graph = self._swarm.connection_dist.realize_mask(self._swarm.composite_graph, edge_mask)
-            realized_graph.display()
+            # realized_graph.display()
         else:
             realized_graph = None
 
@@ -226,8 +226,8 @@ class Evaluator():
             if self._art_dir_name is not None:
                 if i_iter == 0:
                     torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, "edge_logits_final.pt"))
-                else: 
-                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
+                # else: 
+                #     torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
     async def optimize_swarm(
             self,
@@ -253,7 +253,6 @@ class Evaluator():
                                ), f)
 
         def infinite_data_loader() -> Iterator[pd.DataFrame]:
-            np.random.seed(42)
             perm = np.random.permutation(len(dataset))
             while True:
                 for idx in perm:
@@ -297,6 +296,7 @@ class Evaluator():
 
                 realized_graph, log_prob = swarm_copy.connection_dist.realize_particle(
                     swarm_copy.composite_graph,
+                    swarm_copy.connection_dist.edge_logits,
                     # temperature=3.0, # DEBUG
                     )
 

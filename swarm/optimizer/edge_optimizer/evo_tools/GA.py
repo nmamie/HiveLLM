@@ -465,8 +465,8 @@ class GA(GeneticAlgorithmBase):
             if self._art_dir_name is not None:
                 if i_iter == 0:
                     torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, "edge_logits_final.pt"))
-                else: 
-                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
+                # else: 
+                #     torch.save(self._swarm.connection_dist.state_dict(), os.path.join(self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
 
     # ranking = ranking.ranking

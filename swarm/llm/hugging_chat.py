@@ -29,13 +29,14 @@ def load_model(inference: bool = False):
         # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
         model_id1 = "meta-llama/Llama-3.2-3B-Instruct"
         model_id2 = "Qwen/Qwen2.5-3B-Instruct"
-        # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        # model_id2 = "Qwen/Qwen2.5-7B-Instruct"
+        # model_id2 = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     else:
         # model_id = "meta-llama/Meta-Llama-3.1-70B-Instruct"
         model_id1 = "meta-llama/Llama-3.2-3B-Instruct"
         model_id2 = "Qwen/Qwen2.5-3B-Instruct"
         # model_id2 = "Qwen/Qwen2.5-7B-Instruct"
-        # model_id = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        # model_id2 = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
     
     print("model_id1:", model_id1)

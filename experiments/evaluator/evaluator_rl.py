@@ -48,7 +48,10 @@ class Evaluator():
                         (f"_{tensorboard_tag}" if tensorboard_tag is not None else ""))
 
         if enable_artifacts or enable_tensorboard:
-            self._art_dir_name = os.path.join("runs", art_dir_name)
+            if train_dataset.get_domain() == 'mmlu':
+                self._art_dir_name = os.path.join("runs", art_dir_name)
+            else:
+                self._art_dir_name = os.path.join("runs", "_pro", art_dir_name)
             os.makedirs(self._art_dir_name, exist_ok=True)
         else:
             self._art_dir_name = None
@@ -169,7 +172,7 @@ class Evaluator():
                 if mode == 'external_edge_probs':
                     realized_graph, edge_probs, _, _ = self._swarm.connection_dist.realize_gat(
                         self._swarm.composite_graph, record, self._swarm.connection_dist.node_features, threshold=0.5)
-                    realized_graph.display()
+                    # realized_graph.display()
                     if edge_probs is not None:
                         self._print_conns(edge_probs, save_to_file=False)
                 elif mode == 'randomly_connected_swarm':
@@ -230,9 +233,9 @@ class Evaluator():
                 if i_iter == 0:
                     torch.save(self._swarm.connection_dist.state_dict(), os.path.join(
                         self._art_dir_name, "edge_logits_final.pt"))
-                else:
-                    torch.save(self._swarm.connection_dist.state_dict(), os.path.join(
-                        self._art_dir_name, f"edge_logits_{i_iter}.pt"))
+                # else:
+                #     torch.save(self._swarm.connection_dist.state_dict(), os.path.join(
+                #         self._art_dir_name, f"edge_logits_{i_iter}.pt"))
 
     async def optimize_swarm(
             self,
@@ -263,8 +266,6 @@ class Evaluator():
         # optimizer = torch.optim.Adam(params, lr=lr, weight_decay=5e-4) # type: ignore # optimizer with weight decay (l2 regularization)
         policy_optimizer = torch.optim.Adam(
             self._swarm.connection_dist.gat.parameters(), lr=lr)
-        edge_optimizer = torch.optim.Adam(
-            [self._swarm.connection_dist.gat.edge_logits], lr=0.05)
         if beta > 0:
             baseline_optimizer = torch.optim.Adam(
                 [self._swarm.connection_dist.baseline], lr=beta)
@@ -279,7 +280,6 @@ class Evaluator():
                                ), f)
 
         def infinite_data_loader() -> Iterator[pd.DataFrame]:
-            np.random.seed(42)
             perm = np.random.permutation(len(dataset))
             while True:
                 for idx in perm:
@@ -309,7 +309,6 @@ class Evaluator():
             node_features = self._swarm.connection_dist.node_features
 
             log_probs = []
-            log_edge_probs = []
             for i, record in zip(range(batch_size), loader):
                 # create edge mask based on the particle
                 # edge_mask = []
@@ -317,11 +316,10 @@ class Evaluator():
                 #     edge_mask.append(prob > torch.rand(1))
                 # edge_mask = torch.stack(edge_mask)
                 # realize graph based on edge mask
-                realized_graph, edge_probs, log_prob, log_edge_prob = self._swarm.connection_dist.realize_gat(
+                realized_graph, edge_probs, log_prob, edge_logits = self._swarm.connection_dist.realize_gat(
                     self._swarm.composite_graph, record, node_features)  # type: ignore
                 # edge probs all are None results in 0 fitness
                 log_probs.append(log_prob)
-                log_edge_probs.append(log_edge_prob)
                 self._print_conns(edge_probs, save_to_file=False)
                 input_dict = dataset.record_to_swarm_input(record)
                 future_answer = self._swarm.arun(
@@ -338,10 +336,9 @@ class Evaluator():
             # raw_intermediate_answers = [answer[1] for answer in answers]
 
             loss_list: List[torch.Tensor] = []
-            loss_list_edge: List[torch.Tensor] = []
             utilities: List[float] = []
 
-            for raw_answer, correct_answer, log_prob, log_edge_prob in zip(raw_answers, correct_answers, log_probs, log_edge_probs):
+            for raw_answer, correct_answer, log_prob in zip(raw_answers, correct_answers, log_probs):
                 raw_answer = raw_answer[0][0]
                 answer = dataset.postprocess_answer(raw_answer)
                 assert isinstance(correct_answer, str), \
@@ -361,9 +358,7 @@ class Evaluator():
                 else:
                     advantage = utility
                 single_loss = -log_prob * advantage
-                single_loss_edge = -log_edge_prob * advantage
                 loss_list.append(single_loss)
-                loss_list_edge.append(single_loss_edge)
 
             print("utilities:", utilities)
             print("state_value:", state_value.item())
@@ -372,19 +367,14 @@ class Evaluator():
 
             # Compute policy loss with l1 on edge_logits to encourage sparsity
             total_loss = torch.mean(torch.stack(loss_list))
-            total_loss_edge = torch.mean(torch.stack(loss_list_edge))
             print("loss:", total_loss.item())
-            print("loss_edge:", total_loss_edge.item())
             # print("L1 loss:", 0.01 * torch.sum(torch.abs(
             #     torch.stack(edges_probs))).item())
 
             policy_optimizer.zero_grad()
-            edge_optimizer.zero_grad()
-            total_loss.backward(retain_graph=True)
-            total_loss_edge.backward()
-            print("Grad logits:", self._swarm.connection_dist.gat.edge_logits.grad)
+            total_loss.backward()
+            # print("Grad logits:", self._swarm.connection_dist.gat.edge_logits.grad)
             policy_optimizer.step()
-            edge_optimizer.step()
 
             if beta > 0:
                 # Update baseline
@@ -397,10 +387,10 @@ class Evaluator():
                 print("Grad baseline:", self._swarm.connection_dist.baseline.grad)
                 baseline_optimizer.step()
 
-            print("edge_logits:", self._swarm.connection_dist.gat.edge_logits)
-            edge_probs = torch.sigmoid(
-                self._swarm.connection_dist.gat.edge_logits)
-            print("edge_probs:", edge_probs)
+            # print("edge_logits:", self._swarm.connection_dist.gat.edge_logits)
+            # edge_probs = torch.sigmoid(
+            #     self._swarm.connection_dist.gat.edge_logits)
+            # print("edge_probs:", edge_probs)
 
             print("baseline_logits:", self._swarm.connection_dist.baseline)
             baseline = torch.sigmoid(self._swarm.connection_dist.baseline)

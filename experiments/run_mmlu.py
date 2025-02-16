@@ -27,8 +27,8 @@ def parse_args():
     parser.add_argument('--num-iterations', type=int, default=30,
                         help="Number of optimization iterations. Default 30.")
     
-    parser.add_argument('--seed', type=int, default=42,
-                        help="Random seed for reproducibility. Default 42.")
+    parser.add_argument('--seed', type=int, default=991,
+                        help="Random seed for reproducibility. Default 991.")
     
     parser.add_argument('--num-seeds', type=int, default=5,
                         help="Number of random seeds for reproducibility. Default 5.")
@@ -54,6 +54,9 @@ def parse_args():
     
     parser.add_argument('--random-string', action='store_true', default=False,
                         help="Add agents with random strings as role to the swarm")
+    
+    parser.add_argument('--specialist', action='store_true', default=False,
+                        help="Add agents with specialist strings as role to the swarm")
 
     parser.add_argument('--debug', action='store_true', default=False,
                         help="Set for a quick debug cycle")
@@ -87,6 +90,8 @@ async def main():
     mode = args.mode
 
     strategy = MergingStrategy.MajorityVote
+    
+    optimizer = args.optimizer
 
     domain: str = args.domain
     
@@ -110,23 +115,30 @@ async def main():
             if args.adversarial:
                 N = args.num_truthful_agents
                 M = N
-                agent_name_list = N * ["SpecialistDebater"] + M * ["AdversarialAgent"]
+                agent_name_list = N * ["NormalDebater"] + M * ["AdversarialAgent"]
                 swarm_name = f"{N}true_{M}adv"
-                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_adv_seed{seed}"
+                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_{optimizer}_adv_seed{seed}"
                 
             elif args.random_string:
                 N = args.num_truthful_agents
                 M = 0
                 agent_name_list = N * ["RandomDebater"]
                 swarm_name = f"{N}rand"
-                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_rand_seed{seed}"
+                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_{optimizer}_rand_seed{seed}"
+                
+            elif args.specialist:
+                N = args.num_truthful_agents
+                M = 0
+                agent_name_list = N * ["SpecialistDebater"]
+                swarm_name = f"{N}special"
+                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_{optimizer}_special_seed{seed}"
                 
             else:
                 N = args.num_truthful_agents
                 M = 0
-                agent_name_list = N * ["SpecialistDebater"]
+                agent_name_list = N * ["NormalDebater"]
                 swarm_name = f"{N}true"
-                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_seed{seed}"
+                tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_{optimizer}_seed{seed}"
 
             swarm = Swarm(
                 agent_name_list,
@@ -138,7 +150,7 @@ async def main():
             )
             
         if tag is None:
-            tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_seed{seed}"
+            tag = f"{domain}_{swarm_name}_{strategy.name}_{mode}_{optimizer}_seed{seed}"
         
 
         download()
@@ -166,7 +178,7 @@ async def main():
             enable_artifacts=True,
             tensorboard_tag=tag)
 
-        limit_questions = 5 if debug else 153
+        limit_questions = 5 if debug else 100
 
         if mode == 'DirectAnswer':
             score = await evaluator.evaluate_direct_answer(

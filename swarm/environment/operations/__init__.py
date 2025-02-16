@@ -3,6 +3,7 @@ from swarm.environment.operations.generate_query import GenerateQuery
 from swarm.environment.operations.direct_answer import DirectAnswer
 from swarm.environment.operations.specialist_answer import SpecialistAnswer
 from swarm.environment.operations.specialist_debate import SpecialistDebate
+from swarm.environment.operations.normal_debate import NormalDebate
 from swarm.environment.operations.random_debate import RandomDebate
 from swarm.environment.operations.file_analyse import FileAnalyse
 from swarm.environment.operations.web_search import WebSearch
@@ -18,6 +19,7 @@ __all__ = [
     "DirectAnswer",
     "SpecialistAnswer",
     "SpecialistDebate",
+    "NormalDebate",
     "RandomDebate",
     "FileAnalyse",
     "WebSearch",

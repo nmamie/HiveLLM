@@ -49,7 +49,7 @@ class EdgeWiseDistribution(ConnectDistribution):
         # self.node_features = torch.randn(len(node_ids), 16, requires_grad=False)
         self.node_features = torch.randn(len(node_ids), 64, requires_grad=False)
         self.baseline = torch.nn.Parameter(torch.randn(1, requires_grad=True))
-        self.gat = GATWithSentenceEmbedding(num_potential_edges=potential_connections, num_node_features=64, hidden_channels=8, sentence_embedding_dim=64, num_heads=8).to(self.device)
+        self.gat = GATWithSentenceEmbedding(num_nodes=self.node_features.shape[0], num_potential_edges=potential_connections, num_node_features=64, hidden_channels=8, sentence_embedding_dim=64, num_heads=8).to(self.device)
         # self.link_predictor = LinkPredictor(in_channels=16).to(self.device)
         # edge index
         edges = self.potential_connections
@@ -221,17 +221,17 @@ class EdgeWiseDistribution(ConnectDistribution):
         print("Node features shape:", x.shape)
         edge_index = deepcopy(self.edge_index)
         
-        edge_logits, orig_edge_logits = self.gat(x, edge_index, query)
+        edge_logits = self.gat(x, edge_index, query)
         edge_logits = edge_logits.cpu()
-        orig_edge_logits = orig_edge_logits.cpu()
         
         log_probs = []
-        log_edge_probs = []
         
-        edge_probs = edge_logits
+        # Apply sigmoid to get probabilities
+        edge_probs = torch.sigmoid(edge_logits)  # This gives values between 0 and 1
+        print(f"Edge probabilities (post-sigmoid): {edge_probs}")
         
         # print(f"Edge probs after sigmoid: {edge_probs}")
-        for i, (potential_connection, edge_logit, orig_edge_logit) in enumerate(zip(self.potential_connections, edge_logits, orig_edge_logits)):
+        for i, (potential_connection, edge_logit) in enumerate(zip(self.potential_connections, edge_logits)):
             out_node = _graph.find_node(potential_connection[0])
             in_node = _graph.find_node(potential_connection[1])
 
@@ -239,28 +239,22 @@ class EdgeWiseDistribution(ConnectDistribution):
                 continue
 
             if not _graph.check_cycle(in_node, {out_node}, set()):
-                # edge_prob = torch.sigmoid(edge_logit / temperature)
-                edge_prob = edge_logit
-                log_edge_prob = torch.sigmoid(orig_edge_logit / temperature)
+                edge_prob = torch.sigmoid(edge_logit / temperature)
+                # edge_prob = edge_logit
                 # if is_edge:
                 #     out_node.add_successor(in_node)
                 #     in_node.add_predecessor(out_node)
                 if threshold > 0.0:
                     edge_prob = torch.tensor(1 if edge_prob > threshold else 0)
-                    log_edge_prob = torch.tensor(1 if log_edge_prob > threshold else 0)
                 if torch.rand(1) < edge_prob:
                     out_node.add_successor(in_node)
                     # in_node.add_predecessor(out_node)
                     log_probs.append(torch.log(edge_prob))
-                    log_edge_probs.append(torch.log(log_edge_prob))
                 else:
                     log_probs.append(torch.log(1 - edge_prob))
-                    log_edge_probs.append(torch.log(1 - log_edge_prob))
 
         if threshold > 0.0:
             log_probs = torch.tensor([0.0])
-            log_edge_probs = torch.tensor([0.0])
         else:
             log_probs = torch.sum(torch.stack(log_probs))
-            log_edge_probs = torch.sum(torch.stack(log_edge_probs))
-        return _graph, edge_probs, log_probs, log_edge_probs
+        return _graph, edge_probs, log_probs, edge_logits
