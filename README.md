@@ -40,13 +40,6 @@ At a granular level, HiveMind is a library based on the excellent project [GPTSw
 
 ## Quickstart
 
-**Clone the repo**
-
-```bash
-git clone https://github.com/nmamie/HiveLLM.git
-cd HiveLLM/
-```
-
 **Install packages**
 ```
 conda create -n swarm python=3.10
