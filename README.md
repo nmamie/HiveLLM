@@ -55,7 +55,7 @@ OPENAI_API_KEY="" # for OpenAI LLM backend
 SEARCHAPI_API_KEY="" # for Web Search
 ``` -->
 
-**Getting started with HiveMind is easy. Quickly run a predefined swarm**
+<!-- **Getting started with HiveMind is easy. Quickly run a predefined swarm**
 
 ```python
 from swarm.graph.swarm import Swarm
@@ -75,20 +75,20 @@ task = "Tell me more about this image and summarize it in 3 sentences."
 files = ["./datasets/demos/js.png"]
 inputs = {"task": task, "files": files}
 danswer = swarm.run(inputs)
-```
+``` -->
 
 ## Experiments
 
 For a more advanced usage of this framework, see our [experiments](https://github.com/nmamie/HiveLLM/tree/experimental_ga/experiments). 🚀🚀🚀
 
 
-## Class diagram
+<!-- ## Class diagram
 
 <img src="assets/class_diagram.png" alt="Edge optimization" width="700">
 
 ## Example of a Swarm
 
-<img src="assets/swarm_v3.png" alt="Edge optimization" width="500">
+<img src="assets/swarm_v3.png" alt="Edge optimization" width="500"> -->
 
 ## Acknowledgements
 
