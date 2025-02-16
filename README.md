@@ -86,7 +86,7 @@ danswer = swarm.run(inputs)
 
 ## Experiments
 
-For a more advanced usage of this framework, see our [experiments using the Darwinian approach](https://github.com/nmamie/HiveLLM/tree/experimental_ga/experiments) and our [experiments using the Lamarckian approach](https://github.com/nmamie/HiveLLM/tree/experimental/experiments).
+For a more advanced usage of this framework, see our [experiments](https://github.com/nmamie/HiveLLM/tree/experimental_ga/experiments). 🚀🚀🚀
 
 
 ## Class diagram
