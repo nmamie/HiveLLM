@@ -26,8 +26,6 @@ Here is the edge optimization process that updates edge probabilities toward imp
 
 ## About HiveMind
 
-<img src="assets/gpt_swarm.png" alt="Framework" width="799">
-
 At a granular level, HiveMind is a library based on the excellent project [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) that includes the following components: 
 
 
@@ -88,7 +86,7 @@ danswer = swarm.run(inputs)
 
 ## Experiments
 
-For a more advanced usage of this framework, see our [experiments using the Darwinian approach](https://github.com/nmamie/HiveLLM/tree/experimental_ga/experiments) and our [experiments using the Lamarckian approach](https://github.com/nmamie/HiveLLM/tree/experimental/experiments).
+For a more advanced usage of this framework, see our [experiments](https://github.com/nmamie/HiveLLM/tree/experimental_ga/experiments). 🚀🚀🚀
 
 
 ## Class diagram
@@ -104,22 +102,16 @@ For a more advanced usage of this framework, see our [experiments using the Darw
 We acknowledge the excellent projects by [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) and [Evolutionary-Reinforcement-Learning](https://github.com/ShawK91/Evolutionary-Reinforcement-Learning) that largely inspired the development of the Society of HiveMind.
 
 
-## Contributors
-
-* [Noah Mamie](https://nmamie.github.io/) (MSc in AI @ UZH; RA @ ETHZ)
+<!-- ## Contributors -->
 
 <!-- 
 ## Citation
 Please cite our paper if you find the library useful or interesting.
 ```
-@article{mamie2024hivemind,
+@article{zhuge2024language,
   title={Language Agents as Optimizable Graphs},
   author={Zhuge, Mingchen and Wang, Wenyi and Kirsch, Louis and Faccio, Francesco and Khizbullin, Dmitrii and Schmidhuber, Jurgen},
   journal={arXiv preprint arXiv:2402.16823},
   year={2024}
 }
-```
-
-
-
-
+``` -->
