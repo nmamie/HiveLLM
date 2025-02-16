@@ -26,8 +26,6 @@ Here is the edge optimization process that updates edge probabilities toward imp
 
 ## About HiveMind
 
-<img src="assets/gpt_swarm.png" alt="Framework" width="799">
-
 At a granular level, HiveMind is a library based on the excellent project [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) that includes the following components: 
 
 
@@ -104,9 +102,7 @@ For a more advanced usage of this framework, see our [experiments using the Darw
 We acknowledge the excellent projects by [GPTSwarm](https://github.com/metauto-ai/GPTSwarm) and [Evolutionary-Reinforcement-Learning](https://github.com/ShawK91/Evolutionary-Reinforcement-Learning) that largely inspired the development of the Society of HiveMind.
 
 
-## Contributors
-
-* [Noah Mamie](https://nmamie.github.io/) (MSc in AI @ UZH; RA @ ETHZ)
+<!-- ## Contributors -->
 
 <!-- 
 ## Citation
