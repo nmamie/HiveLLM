@@ -1,6 +1,10 @@
 # The Society of HiveMind
 
+## News
+
 🔥 Accepted at [ICSI 2025](https://www.iasei.org/icsi2025/) for oral presentation.
+
+## Overview
 
 🐝 **HiveMind is a graph-based framework for AI foundation model agents, providing two high-level features:**
 
